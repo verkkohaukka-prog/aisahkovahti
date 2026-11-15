@@ -1,0 +1,101 @@
+blueprint:
+  name: "AI-Sähkövahti: Älykäs Lämminvesivaraajan Ohjaus & Legionella-turva"
+  description: "Optimoi lämminvesivaraajan lämmityksen AI-Sähkövahdin parhaiden tuntien mukaan (Pro 7 vrk / VIP 30 vrk mallit), huomioi sisä- ja ulkolämpötilat sekä varmistaa aina ehdottoman Legionella-turvarajan."
+  domain: automation
+  input:
+    water_heater_entity:
+      name: Lämminvesivaraaja (Climate tai Switch)
+      selector:
+        entity:
+          domain: ["climate", "switch"]
+    water_temp_sensor:
+      name: Varaajan lämpötila-anturi
+      selector:
+        entity:
+          domain: sensor
+          device_class: temperature
+    indoor_temp_sensor:
+      name: Kodin sisälämpötila-anturi (valinnainen)
+      default: ""
+      selector:
+        entity:
+          domain: sensor
+          device_class: temperature
+    outdoor_temp_sensor:
+      name: Ulkolämpötila-anturi (valinnainen)
+      default: ""
+      selector:
+        entity:
+          domain: sensor
+          device_class: temperature
+    best_hours_sensor:
+      name: AI-Sähkövahti Optimaaliset Tunnit -sensori
+      selector:
+        entity:
+          domain: sensor
+    min_safe_temp:
+      name: Ehdoton minimilämpötila (Legionella-turva)
+      default: 55
+      selector:
+        number:
+          min: 50
+          max: 60
+          unit_of_measurement: "°C"
+    max_indoor_temp:
+      name: Sisälämpötilan yläraja esilämmityksen estolle
+      default: 23.5
+      selector:
+        number:
+          min: 18
+          max: 26
+          step: 0.5
+          unit_of_measurement: "°C"
+
+mode: single
+
+trigger:
+  - platform: time_pattern
+    hours: "/1"
+  - platform: state
+    entity_id: !input water_temp_sensor
+
+action:
+  - variables:
+      water_temp: "{{ states(input_water_temp_sensor) | float(0) }}"
+      min_temp: !input min_safe_temp
+      best_hours: "{{ states(input_best_hours_sensor) | list }}"
+      current_time: "{{ now().strftime('%H:00') }}"
+      indoor_temp: "{{ states(input_indoor_temp_sensor) | float(20) if input_indoor_temp_sensor else 20 }}"
+      max_indoor: !input max_indoor_temp
+
+  - choose:
+      # 1. TURVATARKISTUS: Jos vesi on alle turvarajan, pakota lämmitys päälle hinnasta riippumatta!
+      - conditions: "{{ water_temp < min_temp }}"
+        sequence:
+          - service: homeassistant.turn_on
+            target:
+              entity_id: !input water_heater_entity
+          - service: persistent_notification.create
+            data:
+              title: "⚠️ AI-Sähkövahti: Legionella-turvavahti aktivoitunut!"
+              message: "Varaajan lämpötila ({{ water_temp }} °C) alitti turvarajan ({{ min_temp }} °C). Lämmitys pakotettu päälle turvallisuussyistä."
+
+      # 2. LÄMPÖTILAOHJAUS: Jos koti on jo valmiiksi erittäin lämmin, säästetään ja estetään turha esilämmitys
+      - conditions: "{{ indoor_temp > max_indoor }}"
+        sequence:
+          - service: homeassistant.turn_off
+            target:
+              entity_id: !input water_heater_entity
+
+      # 3. HINTA-OPTIMOINTI: Jos nykyinen tunti kuuluu AI-Sähkövahdin parhaisiin tunteihin (Pro 7vrk / VIP 30vrk)
+      - conditions: "{{ current_time in best_hours }}"
+        sequence:
+          - service: homeassistant.turn_on
+            target:
+              entity_id: !input water_heater_entity
+
+    default:
+      # Muussa tapauksessa (kalliit tunnit / ei tarvetta) lämmitys on pois päältä
+      - service: homeassistant.turn_off
+        target:
+          entity_id: !input water_heater_entity
