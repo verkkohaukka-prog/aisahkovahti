@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Sähkövahti — Älykäs energianohjaus kotiin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans antialiased">
+
+    <!-- Hero Section -->
+    <header class="bg-gradient-to-r from-blue-900 to-indigo-900 py-20 px-4 text-center">
+        <div class="max-w-4xl mx-auto">
+            <span class="bg-blue-600 text-xs font-semibold uppercase px-3 py-1 rounded-full tracking-wide">Home Assistant -integraatio</span>
+            <h1 class="text-4xl md:text-6xl font-extrabold mt-4 mb-6 tracking-tight">AI-Sähkövahti</h1>
+            <p class="text-xl md:text-2xl text-gray-300 mb-8">Optimoi kotisi sähkönkulutus, lämminvesivaraaja, kotiakusto ja sähköauton lataus tekoälyn ennusteiden avulla.</p>
+            <div class="flex flex-wrap justify-center gap-4">
+                <a href="#hinnasto" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3 rounded-lg shadow-lg transition">Hanki jäsenyys</a>
+                <a href="https://discord.gg/SnBhsXpAW7" target="_blank" class="bg-indigo-700 hover:bg-indigo-800 text-white font-bold px-8 py-3 rounded-lg shadow-lg transition">Liity Discordiin</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Ominaisuudet -->
+    <section class="py-16 px-4 max-w-6xl mx-auto">
+        <h2 class="text-3xl font-bold text-center mb-12">Miksi valita AI-Sähkövahti?</h2>
+        <div class="grid md:grid-cols-3 gap-8">
+            <div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
+                <div class="text-blue-400 text-3xl mb-4">⚡</div>
+                <h3 class="text-xl font-semibold mb-2">Älykkäät Ennusteet</h3>
+                <p class="text-gray-400">Hyödynnä Pro (7 vrk) tai VIP (30 vrk) sähkömarkkinoiden ennusteita ja ajoita kulutus halvimmille tunneille.</p>
+            </div>
+            <div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
+                <div class="text-blue-400 text-3xl mb-4">🛡️</div>
+                <h3 class="text-xl font-semibold mb-2">Turvallisuus ensin</h3>
+                <p class="text-gray-400">Sisäänrakennettu Legionella-turva (min. +55 °C) ja älykkäät suojaukset kotisi järjestelmille.</p>
+            </div>
+            <div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
+                <div class="text-blue-400 text-3xl mb-4">☀️</div>
+                <h3 class="text-xl font-semibold mb-2">Kattava automaatio</h3>
+                <p class="text-gray-400">Valmiit Blueprints-pohjat lämminvesivaraajalle, sähköauton lataukselle, akustolle ja aurinkosähkön ylijäämälle.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Hinnasto / Tuotteet -->
+    <section id="hinnasto" class="py-16 px-4 bg-gray-800/50">
+        <div class="max-w-5xl mx-auto text-center">
+            <h2 class="text-3xl font-bold mb-4">Valitse tarpeisiisi sopiva taso</h2>
+            <p class="text-gray-400 mb-12">Asennuspaketti sisältää kaikki tarvittavat ohjeet ja Home Assistant -komponentit.</p>
+            
+            <div class="grid md:grid-cols-2 gap-8 text-left">
+                <!-- Pro-taso -->
+                <div class="bg-gray-800 p-8 rounded-2xl border border-gray-700 flex flex-col justify-between">
+                    <div>
+                        <span class="text-blue-400 font-semibold uppercase text-sm">Suosittu</span>
+                        <h3 class="text-2xl font-bold mt-1 mb-2">AI-Sähkövahti Pro</h3>
+                        <p class="text-gray-400 mb-6">Erinomainen valinta peruskotiin.</p>
+                        <ul class="space-y-3 mb-8 text-gray-300">
+                            <li>✓ 7 vuorokauden hintiennusteet</li>
+                            <li>✓ Valmiit Home Assistant Blueprintit</li>
+                            <li>✓ Lämminvesivaraaja- & EV-ohjaus</li>
+                            <li>✓ Vapaaehtoinen Discord-yhteisö</li>
+                        </ul>
+                    </div>
+                    <a href="https://hawknet.gumroad.com/" target="_blank" class="block text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition">Hanki Pro-taso</a>
+                </div>
+
+                <!-- VIP-taso -->
+                <div class="bg-gray-800 p-8 rounded-2xl border border-blue-500 flex flex-col justify-between relative shadow-xl">
+                    <div>
+                        <span class="bg-blue-500 text-white text-xs font-bold uppercase px-3 py-1 rounded-full">Laajin</span>
+                        <h3 class="text-2xl font-bold mt-1 mb-2">AI-Sähkövahti VIP</h3>
+                        <p class="text-gray-400 mb-6">Täysi paketti edistyneelle energianhallinnalle.</p>
+                        <ul class="space-y-3 mb-8 text-gray-300">
+                            <li>✓ 30 vuorokauden pitkän aikavälin ennusteet</li>
+                            <li>✓ Kaikki Pro-tason ominaisuudet</li>
+                            <li>✓ Kotiakuston ja aurinkosähkön optimointi</li>
+                            <li>✓ Priorisoitu tuki & Discord-yhteisö</li>
+                        </ul>
+                    </div>
+                    <a href="https://hawknet.gumroad.com/" target="_blank" class="block text-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition">Hanki VIP-taso</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Yhteystiedot & Discord -->
+    <section class="py-16 px-4 max-w-4xl mx-auto text-center">
+        <h2 class="text-2xl font-bold mb-4">Kysyttävää tai tarvitsetko apua?</h2>
+        <p class="text-gray-400 mb-6">Ota yhteyttä sähköpostitse tai liy mukaan yhteisöön!</p>
+        <div class="flex justify-center gap-6">
+            <a href="mailto:verkkohaukka@gmail.com" class="text-blue-400 hover:underline">verkkohaukka@gmail.com</a>
+            <a href="https://discord.gg/SnBhsXpAW7" target="_blank" class="text-indigo-400 hover:underline">Discord-yhteisö (vapaaehtoinen)</a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-950 py-8 text-center text-gray-500 text-sm">
+        <p>© AI-Sähkövahti / VerkkoHaukka®. Kaikki oikeudet pidätetään.</p>
+    </footer>
+
+</body>
+</html>
