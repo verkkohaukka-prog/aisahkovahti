@@ -1,0 +1,71 @@
+blueprint:
+  name: "AI-Sähkövahti: Aurinkosähkön Ylijäämän Ohjaus"
+  description: "Ohjaa aurinkopaneelien ylijäämäsähkön veden lämmitykseen tai muihin kuormiin, kun kotiakusto on täynnä."
+  domain: automation
+  input:
+    solar_production_sensor:
+      name: Aurinkosähkön nykyinen tuotanto (W)
+      selector:
+        entity:
+          domain: sensor
+          device_class: power
+    home_consumption_sensor:
+      name: Talon hetkellinen kokonaiskulutus (W)
+      selector:
+        entity:
+          domain: sensor
+          device_class: power
+    battery_soc_sensor:
+      name: Kotiakuston varaustaso % (valinnainen)
+      default: ""
+      selector:
+        entity:
+          domain: sensor
+          device_class: battery
+    target_appliance_switch:
+      name: Ohjattava laite (esim. Lämminvesivaraaja / Vastus)
+      selector:
+        entity:
+          domain: switch
+    excess_threshold:
+      name: Ylijäämän raja-arvo käynnistykselle (W)
+      default: 1000
+      selector:
+        number:
+          min: 200
+          max: 5000
+          step: 100
+          unit_of_measurement: "W"
+
+mode: single
+
+trigger:
+  - platform: state
+    entity_id: !input solar_production_sensor
+  - platform: state
+    entity_id: !input home_consumption_sensor
+
+action:
+  - variables:
+      solar: "{{ states(input_solar_production_sensor) | float(0) }}"
+      consumption: "{{ states(input_home_consumption_sensor) | float(0) }}"
+      battery_soc: "{{ states(input_battery_soc_sensor) | float(100) if input_battery_soc_sensor != '' else 100 }}"
+      threshold: !input excess_threshold
+      # Ylijäämä = Tuotanto miinus kulutus (ilman kohdelaitetta)
+      excess_power: "{{ solar - consumption }}"
+
+  - choose:
+      # JOS akku on täynnä (tai ei akkua) JA ylijäämää on enemmän kuin kynnysarvo
+      - conditions:
+          - "{{ battery_soc >= 95 }}"
+          - "{{ excess_power >= threshold }}"
+        sequence:
+          - service: homeassistant.turn_on
+            target:
+              entity_id: !input target_appliance_switch
+
+    default:
+      # Muussa tapauksessa vapautetaan kuorma normaaliin pörssisähköohjaukseen
+      - service: homeassistant.turn_off
+        target:
+          entity_id: !input target_appliance_switch
