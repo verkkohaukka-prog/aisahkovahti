@@ -1,0 +1,67 @@
+blueprint:
+  name: "AI-Sähkövahti: Sähköauton Älylataus"
+  description: "Käynnistää sähköauton latauksen automaattisesti AI-Sähkövahdin parhaina tunteina (Pro 7 vrk / VIP 30 vrk ennusteet) ja keskeyttää sen muiden tuntien ajaksi."
+  domain: automation
+  input:
+    charger_entity:
+      name: Sähköauton laturi tai kytkin (Switch)
+      selector:
+        entity:
+          domain: switch
+    best_hours_sensor:
+      name: AI-Sähkövahti Optimaaliset Tunnit -sensori
+      selector:
+        entity:
+          domain: sensor
+    car_battery_sensor:
+      name: Auton akun varaustaso % (valinnainen - pysäyttää latauksen täyttyessä)
+      default: ""
+      selector:
+        entity:
+          domain: sensor
+          device_class: battery
+    max_soc_limit:
+      name: Maksimi lataustaso (%)
+      default: 80
+      selector:
+        number:
+          min: 50
+          max: 100
+          step: 5
+          unit_of_measurement: "%"
+
+mode: single
+
+trigger:
+  - platform: time_pattern
+    hours: "/1"
+  - platform: state
+    entity_id: !input best_hours_sensor
+
+action:
+  - variables:
+      best_hours: "{{ states(input_best_hours_sensor) | list }}"
+      current_time: "{{ now().strftime('%H:00') }}"
+      soc: "{{ states(input_car_battery_sensor) | float(0) if input_car_battery_sensor else 0 }}"
+      max_soc: !input max_soc_limit
+
+  - choose:
+      # 1. Jos akku on jo täynnä asetetun rajan yli, pidä laturi poissa päältä
+      - conditions: "{{ input_car_battery_sensor != '' and soc >= max_soc }}"
+        sequence:
+          - service: homeassistant.turn_off
+            target:
+              entity_id: !input charger_entity
+
+      # 2. HINTA-OPTIMOINTI: Jos nyt ollaan AI-Sähkövahdin parhailla tunneilla, käynnistä lataus
+      - conditions: "{{ current_time in best_hours }}"
+        sequence:
+          - service: homeassistant.turn_on
+            target:
+              entity_id: !input charger_entity
+
+    default:
+      # Muina tunteina lataus on keskeytetty
+      - service: homeassistant.turn_off
+        target:
+          entity_id: !input charger_entity
