@@ -1,0 +1,63 @@
+blueprint:
+  name: "AI-Sähkövahti: Kotiakuston Älyohjaus"
+  description: "Lataa kotiakustoa AI-Sähkövahdin edullisina tunteina ja optimoi purkua/verkkosyöttöä hintahuippujen välttämiseksi."
+  domain: automation
+  input:
+    battery_mode_select:
+      name: Invertterin toimintatila (Select-entiteetti tai kytkin)
+      selector:
+        entity:
+          domain: ["select", "switch"]
+    best_hours_sensor:
+      name: AI-Sähkövahti Optimaaliset Tunnit -sensori
+      selector:
+        entity:
+          domain: sensor
+    spike_warning_sensor:
+      name: AI-Sähkövahti Hintapiikkivaroitus -sensori
+      selector:
+        entity:
+          domain: sensor
+
+mode: single
+
+trigger:
+  - platform: time_pattern
+    hours: "/1"
+  - platform: state
+    entity_id: !input best_hours_sensor
+  - platform: state
+    entity_id: !input spike_warning_sensor
+
+action:
+  - variables:
+      best_hours: "{{ states(input_best_hours_sensor) | list }}"
+      current_time: "{{ now().strftime('%H:00') }}"
+      spike_active: "{{ is_state(input_spike_warning_sensor, 'true') or is_state(input_spike_warning_sensor, 'True') }}"
+
+  - choose:
+      # 1. HALVAT TUNNIT: Pakotetaan akku lataukseen verkosta/aurangosta edullisella hinnalla
+      - conditions: "{{ current_time in best_hours }}"
+        sequence:
+          - service: select.select_option
+            target:
+              entity_id: !input battery_mode_select
+            data:
+              option: "Charge" # Huom. Muuta invertterimerkkisi mukaiseksi (es. Force Charge / Grid Charge)
+
+      # 2. HINTAPIIKKI / KALLIS TUNTI: Puretaan akkua / estetään verkkosähkön käyttö (Self-consumption / Backup mode)
+      - conditions: "{{ spike_active }}"
+        sequence:
+          - service: select.select_option
+            target:
+              entity_id: !input battery_mode_select
+            data:
+              option: "Discharge" # Tai Backup / Max Self-Consumption
+
+    default:
+      # Normaalitila / Älykäs perusasetus
+      - service: select.select_option
+        target:
+          entity_id: !input battery_mode_select
+        data:
+          option: "Auto"
