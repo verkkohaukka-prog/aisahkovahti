@@ -1,0 +1,10 @@
+{
+  "domain": "aisahkovahti",
+  "name": "AI-Sähkövahti",
+  "documentation": "https://aisahkovahti.65.109.171.178.sslip.io/",
+  "requirements": [],
+  "codeowners": ["@Verkkohaukka"],
+  "config_flow": true,
+  "iot_class": "cloud_polling",
+  "version": "1.0.0"
+}
