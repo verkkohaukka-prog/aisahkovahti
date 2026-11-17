@@ -40,14 +40,14 @@ trigger:
 
 action:
   - variables:
-      best_hours: "{{ states(input_best_hours_sensor) | list }}"
+      best_hours: "{{ state_attr(states['!input best_hours_sensor'].entity_id, 'raw_hours') | list }}"
       current_time: "{{ now().strftime('%H:00') }}"
-      soc: "{{ states(input_car_battery_sensor) | float(0) if input_car_battery_sensor else 0 }}"
+      soc: "{{ states(states['!input car_battery_sensor'].entity_id) | float(0) if !input car_battery_sensor else 0 }}"
       max_soc: !input max_soc_limit
 
   - choose:
       # 1. Jos akku on jo täynnä asetetun rajan yli, pidä laturi poissa päältä
-      - conditions: "{{ input_car_battery_sensor != '' and soc >= max_soc }}"
+      - conditions: "{{ !input car_battery_sensor != '' and soc >= max_soc }}"
         sequence:
           - service: homeassistant.turn_off
             target:
