@@ -1,1 +1,64 @@
+blueprint:
+  name: "AI-Sähkövahti: Rakenteiden Ennakoiva Esilämmitys (Thermal Pre-heating)"
+  description: "Lämmittää rakenteita (lattialämmitys tai ilmalämpöpumppu) +2–5 °C normaalia enemmän AI-Sähkövahdin edullisina tunneina, erityisesti ennen ennakoitua kylmää jaksoa."
+  domain: automation
+  input:
+    climate_entity:
+      name: Lämmityslaite (Climate - Ilmalämpöpumppu tai termostaatti)
+      selector:
+        entity:
+          domain: climate
+    best_hours_sensor:
+      name: AI-Sähkövahti Optimaaliset Tunnit -sensori
+      selector:
+        entity:
+          domain: sensor
+    temp_boost_amount:
+      name: Lämpötilan nosto esilämmityksen aikana (°C)
+      default: 2.0
+      selector:
+        number:
+          min: 1.0
+          max: 5.0
+          step: 0.5
+          unit_of_measurement: "°C"
+    spike_warning_sensor:
+      name: AI-Sähkövahti Hintapiikkivaroitus-sensori (valinnainen)
+      default: ""
+      selector:
+        entity:
+          domain: sensor
 
+mode: single
+
+trigger:
+  - platform: time_pattern
+    hours: "/1"
+  - platform: state
+    entity_id: !input best_hours_sensor
+
+action:
+  - variables:
+      best_hours: "{{ state_attr(states['!input best_hours_sensor'].entity_id, 'raw_hours') | list }}"
+      current_time: "{{ now().strftime('%H:00') }}"
+      boost: !input temp_boost_amount
+      # Haetaan laitteen nykyinen peruslämpötila tai käytetään oletusta
+      current_target: "{{ state_attr(states['!input climate_entity'].entity_id, 'temperature') | float(21) }}"
+
+  - choose:
+      # JOS nyt ollaan AI-Sähkövahdin parhailla tunneilla -> Nostetaan lämpötilaa (esilämmitetään rakenteita)
+      - conditions: "{{ current_time in best_hours }}"
+        sequence:
+          - service: climate.set_temperature
+            target:
+              entity_id: !input climate_entity
+            data:
+              temperature: "{{ current_target + boost }}"
+
+    default:
+      # Muina tunteina palautetaan normaaliin tavoitelämpötilaan (vähennetään boost pois)
+      - service: climate.set_temperature
+            target:
+              entity_id: !input climate_entity
+            data:
+              temperature: "{{ current_target - boost if current_target > 18 else current_target }}"
