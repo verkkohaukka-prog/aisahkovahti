@@ -38,5 +38,6 @@ class AISahkovahtiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         return data.get("active", False)
         except Exception:
             pass
-        # Kehitysvaiheessa / offline-tilassa voidaan sallia tai palauttaa false
-        return True
+        
+        # Vaaditaan ehdoton verkkoyhteys ja onnistunut tarkistus (ei päästä läpi ilman palvelimen hyväksyntää)
+        return False
