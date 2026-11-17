@@ -31,9 +31,9 @@ trigger:
 
 action:
   - variables:
-      best_hours: "{{ states(input_best_hours_sensor) | list }}"
+      best_hours: "{{ state_attr(states['!input best_hours_sensor'].entity_id, 'raw_hours') | list }}"
       current_time: "{{ now().strftime('%H:00') }}"
-      spike_active: "{{ is_state(input_spike_warning_sensor, 'true') or is_state(input_spike_warning_sensor, 'True') }}"
+      spike_active: "{{ is_state(states['!input spike_warning_sensor'].entity_id, 'true') or is_state(states['!input spike_warning_sensor'].entity_id, 'True') }}"
 
   - choose:
       # 1. HALVAT TUNNIT: Pakotetaan akku lataukseen verkosta/aurangosta edullisella hinnalla
