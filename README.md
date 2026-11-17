@@ -75,6 +75,6 @@ Kun paketti on asennettu, voit ottaa käyttöön neljä valmista automaatiota ko
 Onko sinulla kysyttävää, tarvitsetko apua asennuksessa tai haluatko keskustella kaupallisesta yhteistyöstä?
 - **Sähköposti & Yhteydenotot:** `verkkohaukka@gmail.com`
 - **Discord-yhteisö:** [https://discord.gg/SnBhsXpAW7](https://discord.gg/SnBhsXpAW7)
-- **Kotisivut & Sähkövertailu:** [https://www.verkkohaukka.fi](https://www.verkkohaukka.fi)
+- **AI-Sähkövahti:** https://aisahkovahti.65.109.171.178.sslip.io/
 
 *AI-Sähkövahti / VerkkoHaukka® — Kaikki oikeudet pidätetään.*
