@@ -1,4 +1,4 @@
-tässä vielä readme.me:# ⚡ AI-Sähkövahti Home Assistant Integration (Pro & VIP)
+⚡ AI-Sähkövahti Home Assistant Integration (Pro & VIP)
 
 Tervetuloa AI-Sähkövahdin viralliseen Home Assistant -integraatiopakettiin! Tämä paketti mahdollistaa sähkömarkkinoiden älykkään ohjauksen, hintojen ennakoinnin (Pro 7 vrk / VIP 30 vrk), sähköauton älylatauksen, kotiakuston ohjauksen sekä aurinkosähkön ylijäämän hyödyntämisen turvallisesti.
 
