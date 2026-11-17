@@ -47,11 +47,10 @@ trigger:
 
 action:
   - variables:
-      solar: "{{ states(input_solar_production_sensor) | float(0) }}"
-      consumption: "{{ states(input_home_consumption_sensor) | float(0) }}"
-      battery_soc: "{{ states(input_battery_soc_sensor) | float(100) if input_battery_soc_sensor != '' else 100 }}"
+      solar: "{{ states(states['!input solar_production_sensor'].entity_id) | float(0) }}"
+      consumption: "{{ states(states['!input home_consumption_sensor'].entity_id) | float(0) }}"
+      battery_soc: "{{ states(states['!input battery_soc_sensor'].entity_id) | float(100) if !input battery_soc_sensor != '' else 100 }}"
       threshold: !input excess_threshold
-      # Ylijäämä = Tuotanto miinus kulutus (ilman kohdelaitetta)
       excess_power: "{{ solar - consumption }}"
 
   - choose:
