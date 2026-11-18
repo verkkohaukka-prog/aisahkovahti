@@ -61,6 +61,7 @@ Jotta dynaamiset autoprofiilit, keskusten turvatehorajat ja audit-loki latautuva
 YAML
 homeassistant:
   packages: !include_dir_named packages
+
 (Jos tiedostossa on jo homeassistant:-otsikko, lisää vain rivi packages: !include_dir_named packages sen alle kahdella välilyönnillä sisennettynä.)
 
 3. Käynnistä Home Assistant uudelleen ja lisää integraatio
