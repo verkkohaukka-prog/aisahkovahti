@@ -1,0 +1,33 @@
+# Sähköautojen laiteprofiilit (VIP-kaavakkeen kohta 1)
+cars:
+  - id: auto_1
+    name: "Auto 1 (esim. Pääauto)"
+    identifiers:
+      vin: ""
+      ble_mac: ""
+      rfid_tag: ""
+    battery_kwh: 75.0
+    max_ac_kw: 11.0
+    phases: 3
+    min_current_a: 6
+    max_current_a: 16
+    charge_efficiency: 0.92
+    target_soc_default: 80
+    buffer_kwh: 8.0
+    priority: 1
+
+  - id: auto_2
+    name: "Auto 2 (esim. Kakkosauto)"
+    identifiers:
+      vin: ""
+      ble_mac: ""
+      rfid_tag: ""
+    battery_kwh: 40.0
+    max_ac_kw: 6.6
+    phases: 1
+    min_current_a: 6
+    max_current_a: 16
+    charge_efficiency: 0.88
+    target_soc_default: 80
+    buffer_kwh: 4.0
+    priority: 2
