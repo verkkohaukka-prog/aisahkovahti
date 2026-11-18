@@ -1,9 +1,21 @@
-# Kiinteistön turvarajat ja lukitukset (VIP-kaavakkeen kohta 6)
-safety:
-  global:
+# Kiinteistön ja erillisten ryhmäkeskusten turvarajat (VIP-kaavakkeen kohta 6)
+panels:
+  - id: paakeskus
+    name: "Päärakennuksen pääkeskus"
     main_fuse_a: 25                  # Esim. 3x25A
     max_total_kw: 17.25              # 3 * 230V * 25A = 17.25 kW
     safe_margin_kw: 15.0             # Raja, jonka yli uusia kuormia ei kytketä
+    power_sensor: sensor.paakeskus_teho
+
+  - id: autotalli_keskus
+    name: "Autotallin / piharakennuksen ryhmäkeskus"
+    main_fuse_a: 16                  # Esim. 3x16A (tai oma 3x25A liittymä)
+    max_total_kw: 11.04              # 3 * 230V * 16A = 11.04 kW
+    safe_margin_kw: 9.5              # Raja, jonka yli latausta rajoitetaan
+    power_sensor: sensor.autotalli_teho
+
+safety:
+  global:
     max_step_kw_per_min: 3.0         # Kuormanmuutoksen nopeusraja
     watchdog_timeout_s: 60
     dry_run: false                   # true = simuloi päätökset ilman releohjausta
@@ -15,6 +27,6 @@ safety:
     - id: floor_fault_ilp_protection
       condition: "floor_fault_alert == on"
       action: "limit_ilp_max_kw: 3.0"
-    - id: main_fuse_ev_block
-      condition: "total_house_kw > 14.0"
+    - id: panel_fuse_ev_block
+      condition: "active_panel_kw > active_panel_safe_margin_kw"
       action: "pause_or_limit_ev_charging"
