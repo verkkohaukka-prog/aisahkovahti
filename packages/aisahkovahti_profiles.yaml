@@ -30,17 +30,27 @@ input_number:
     min: 20
     max: 100
     step: 5
+    initial: 80
     unit_of_measurement: "%"
     icon: mdi:battery-charging-80
 
   house_max_safe_kw:
-    name: "Kiinteistön turvatehoraja"
+    name: "Pääkeskuksen turvatehoraja"
     min: 5.0
     max: 45.0
     step: 0.5
     initial: 15.0
     unit_of_measurement: "kW"
     icon: mdi:shield-check
+
+  garage_max_safe_kw:
+    name: "Autotallin / pihakeskuksen turvatehoraja"
+    min: 3.0
+    max: 45.0
+    step: 0.5
+    initial: 9.5
+    unit_of_measurement: "kW"
+    icon: mdi:garage-variant
 
 input_boolean:
   floor_fault_alert:
@@ -60,38 +70,58 @@ input_text:
 script:
   apply_car_profile:
     alias: "AI-Sähkövahti: Aseta autoprofiili"
-    description: "Päivittää helperit valitun auton mukaisiksi ja vaatii vahvistuksen kriittisille rajoille."
+    description: "Päivittää helperit valitun auton mukaisiksi dynaamisesti ja kirjaa muutoksen audit-lokiin."
     sequence:
+      - variables:
+          selected: "{{ states('input_select.active_car_profile') }}"
+          parsed_kwh: >
+            {% set m = selected | regex_findall('([0-9]+(?:\\.[0-9]+)?)\\s*kWh', ignorecase=True) %}
+            {{ m[0] | float(75) if m | length > 0 else 75 }}
+          parsed_kw: >
+            {% set m = selected | regex_findall('([0-9]+(?:\\.[0-9]+)?)\\s*kW', ignorecase=True) %}
+            {{ m[0] | float(11.0) if m | length > 0 else 11.0 }}
+          calculated_amps: >
+            {% if parsed_kw <= 7.4 %}
+              {{ [[(parsed_kw * 1000 / 230) | round(0) | int, 6] | max, 32] | min }}
+            {% else %}
+              {{ [[(parsed_kw * 1000 / (3 * 230)) | round(0) | int, 6] | max, 32] | min }}
+            {% endif %}
       - choose:
           - conditions:
-              - condition: state
-                entity_id: input_select.active_car_profile
-                state: "Auto 1 (75 kWh / 11 kW)"
+              - condition: template
+                value_template: "{{ selected == 'Ei autoa kytketty' }}"
             sequence:
-              - service: input_number.set_value
-                target: { entity_id: input_number.car_battery_kwh }
-                data: { value: 75 }
-              - service: input_number.set_value
-                target: { entity_id: input_number.car_max_current }
-                data: { value: 16 }
               - service: input_text.set_value
-                target: { entity_id: input_text.last_decision_reason }
-                data: { value: "Autoprofiili 1 aktivoitu (75 kWh, max 16 A)" }
-          - conditions:
-              - condition: state
-                entity_id: input_select.active_car_profile
-                state: "Auto 2 (40 kWh / 6.6 kW)"
-            sequence:
-              - service: input_number.set_value
-                target: { entity_id: input_number.car_battery_kwh }
-                data: { value: 40 }
-              - service: input_number.set_value
-                target: { entity_id: input_number.car_max_current }
-                data: { value: 16 }
-              - service: input_text.set_value
-                target: { entity_id: input_text.last_decision_reason }
-                data: { value: "Autoprofiili 2 aktivoitu (40 kWh, max 16 A)" }
+                target:
+                  entity_id: input_text.last_decision_reason
+                data:
+                  value: "Ei autoa kytketty – latausprofiili valmiustilassa."
+        default:
+          - service: input_number.set_value
+            target:
+              entity_id: input_number.car_battery_kwh
+            data:
+              value: "{{ parsed_kwh }}"
+          - service: input_number.set_value
+            target:
+              entity_id: input_number.car_max_current
+            data:
+              value: "{{ calculated_amps }}"
+          - service: input_text.set_value
+            target:
+              entity_id: input_text.last_decision_reason
+            data:
+              value: "Profiili '{{ selected }}' aktivoitu ({{ parsed_kwh }} kWh, max {{ calculated_amps }} A)."
       - service: logbook.log
         data:
           name: "AI-Sähkövahti Profiili"
           message: "{{ states('input_text.last_decision_reason') }}"
+
+automation:
+  - id: aisahkovahti_auto_profile_sync
+    alias: "AI-Sähkövahti: Päivitä autoprofiili valinnasta"
+    trigger:
+      - platform: state
+        entity_id: input_select.active_car_profile
+    action:
+      - service: script.apply_car_profile
