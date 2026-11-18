@@ -1,0 +1,97 @@
+input_select:
+  active_car_profile:
+    name: "Aktiivinen sähköautoprofiili"
+    options:
+      - "Ei autoa kytketty"
+      - "Auto 1 (75 kWh / 11 kW)"
+      - "Auto 2 (40 kWh / 6.6 kW)"
+    initial: "Ei autoa kytketty"
+    icon: mdi:car-electric
+
+input_number:
+  car_battery_kwh:
+    name: "Auton akun kapasiteetti"
+    min: 10
+    max: 150
+    step: 1
+    unit_of_measurement: "kWh"
+    icon: mdi:battery-high
+
+  car_max_current:
+    name: "Latauksen enimmäisvirta"
+    min: 6
+    max: 32
+    step: 1
+    unit_of_measurement: "A"
+    icon: mdi:current-ac
+
+  car_target_soc:
+    name: "Auton tavoitevaraus (SoC)"
+    min: 20
+    max: 100
+    step: 5
+    unit_of_measurement: "%"
+    icon: mdi:battery-charging-80
+
+  house_max_safe_kw:
+    name: "Kiinteistön turvatehoraja"
+    min: 5.0
+    max: 45.0
+    step: 0.5
+    initial: 15.0
+    unit_of_measurement: "kW"
+    icon: mdi:shield-check
+
+input_boolean:
+  floor_fault_alert:
+    name: "Hälytys: Lämmityspiirin tehopoikkeama"
+    icon: mdi:alert-decagram
+
+  profile_change_confirmed:
+    name: "Profiilimuutos vahvistettu"
+    icon: mdi:check-decagram
+
+input_text:
+  last_decision_reason:
+    name: "Viimeisin ohjausperustelu (Audit)"
+    max: 255
+    icon: mdi:history
+
+script:
+  apply_car_profile:
+    alias: "AI-Sähkövahti: Aseta autoprofiili"
+    description: "Päivittää helperit valitun auton mukaisiksi ja vaatii vahvistuksen kriittisille rajoille."
+    sequence:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_select.active_car_profile
+                state: "Auto 1 (75 kWh / 11 kW)"
+            sequence:
+              - service: input_number.set_value
+                target: { entity_id: input_number.car_battery_kwh }
+                data: { value: 75 }
+              - service: input_number.set_value
+                target: { entity_id: input_number.car_max_current }
+                data: { value: 16 }
+              - service: input_text.set_value
+                target: { entity_id: input_text.last_decision_reason }
+                data: { value: "Autoprofiili 1 aktivoitu (75 kWh, max 16 A)" }
+          - conditions:
+              - condition: state
+                entity_id: input_select.active_car_profile
+                state: "Auto 2 (40 kWh / 6.6 kW)"
+            sequence:
+              - service: input_number.set_value
+                target: { entity_id: input_number.car_battery_kwh }
+                data: { value: 40 }
+              - service: input_number.set_value
+                target: { entity_id: input_number.car_max_current }
+                data: { value: 16 }
+              - service: input_text.set_value
+                target: { entity_id: input_text.last_decision_reason }
+                data: { value: "Autoprofiili 2 aktivoitu (40 kWh, max 16 A)" }
+      - service: logbook.log
+        data:
+          name: "AI-Sähkövahti Profiili"
+          message: "{{ states('input_text.last_decision_reason') }}"
