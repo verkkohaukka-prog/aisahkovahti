@@ -1,0 +1,27 @@
+# Lattia- ja kattolämmitysvastukset sekä sähköpatterit (VIP-kaavakkeen kohdat 3–5)
+heating_circuits:
+  - id: lattia_1
+    name: "Lattialämmitys – Kylpyhuone"
+    type: resistive_floor
+    relay_entity: switch.kylpyhuone_lattia
+    power_sensor: sensor.kylpyhuone_lattia_teho
+    nominal_resistance_ohm: 52.9
+    nominal_power_w: 1000
+    tolerance_pct: 10
+    max_surface_temp_c: 35
+
+  - id: katto_1
+    name: "Kattolämmitys – Olohuone"
+    type: resistive_ceiling
+    relay_entity: switch.olohuone_katto
+    power_sensor: sensor.olohuone_katto_teho
+    nominal_resistance_ohm: 35.3
+    nominal_power_w: 1500
+    tolerance_pct: 10
+
+  - id: patteriryhma_1
+    name: "Sähköpatterit – Makuuhuoneet (3 kpl)"
+    type: electric_radiator_group
+    unit_count: 3
+    unit_power_w: 800
+    total_nominal_power_w: 2400
