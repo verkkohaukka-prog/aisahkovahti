@@ -1,6 +1,6 @@
 blueprint:
-  name: "AI-Sähkövahti: Sähköauton Älylataus"
-  description: "Käynnistää sähköauton latauksen automaattisesti AI-Sähkövahdin parhaina tunteina (Pro 7 vrk / VIP 30 vrk ennusteet) ja keskeyttää sen muiden tuntien ajaksi."
+  name: "AI-Sähkövahti: Sähköauton Älylataus (Profiili- & Ryhmäkeskustuki)"
+  description: "Käynnistää sähköauton latauksen automaattisesti AI-Sähkövahdin parhaina tunteina huomioiden aktiivisen autoprofiilin, tavoitevarauksen sekä valitun pää- tai ryhmäkeskuksen (esim. asunto tai erillinen autotalli) sulakkeiden turvatehorajan."
   domain: automation
   input:
     charger_entity:
@@ -21,7 +21,7 @@ blueprint:
           domain: sensor
           device_class: battery
     max_soc_limit:
-      name: Maksimi lataustaso (%)
+      name: Oletus maksimi lataustaso (%)
       default: 80
       selector:
         number:
@@ -29,6 +29,49 @@ blueprint:
           max: 100
           step: 5
           unit_of_measurement: "%"
+    car_target_soc_helper:
+      name: Autoprofiilin tavoitevaraus-helper (valinnainen)
+      description: "Yliajaa oletusrajan aktiivisen autoprofiilin (input_number.car_target_soc) mukaan."
+      default: ""
+      selector:
+        entity:
+          domain: input_number
+    car_max_current_helper:
+      name: Autoprofiilin maksimivirta-helper (valinnainen)
+      description: "Autoprofiilin mukainen maksimilatausvirta (esim. input_number.car_max_current)."
+      default: ""
+      selector:
+        entity:
+          domain: input_number
+    charger_current_entity:
+      name: Laturin latausvirran säätö (A) (valinnainen)
+      description: "Asettaa laturin virran valitun autoprofiilin mukaiseksi ennen latauksen aloitusta."
+      default: ""
+      selector:
+        entity:
+          domain: number
+    panel_total_power_sensor:
+      name: Ryhmä- tai pääkeskuksen kokonaisteho (kW tai W) (valinnainen)
+      description: "Valitse sen keskuksen (esim. pääkeskus tai erillinen autotallin keskus) tehosensori, jonka sulakkeiden takana laturi on."
+      default: ""
+      selector:
+        entity:
+          domain: sensor
+          device_class: power
+    panel_max_safe_kw_helper:
+      name: Ryhmä- tai pääkeskuksen turvatehoraja-helper (kW) (valinnainen)
+      description: "Valitse kyseisen keskuksen turvatehoraja (esim. input_number.house_max_safe_kw tai input_number.garage_max_safe_kw)."
+      default: ""
+      selector:
+        entity:
+          domain: input_number
+    decision_reason_helper:
+      name: Audit-lokin syyteksti-helper (valinnainen)
+      description: "Kirjaa päätöksen perustelun (esim. input_text.last_decision_reason)."
+      default: ""
+      selector:
+        entity:
+          domain: input_text
 
 mode: single
 
@@ -38,30 +81,115 @@ trigger:
   - platform: state
     entity_id: !input best_hours_sensor
 
-action:
-  - variables:
-      best_hours: "{{ state_attr(states['!input best_hours_sensor'].entity_id, 'raw_hours') | list }}"
-      current_time: "{{ now().strftime('%H:00') }}"
-      soc: "{{ states(states['!input car_battery_sensor'].entity_id) | float(0) if !input car_battery_sensor else 0 }}"
-      max_soc: !input max_soc_limit
+variables:
+  charger_ent: !input charger_entity
+  best_hours_ent: !input best_hours_sensor
+  soc_ent: !input car_battery_sensor
+  fallback_max_soc: !input max_soc_limit
+  target_soc_helper: !input car_target_soc_helper
+  max_current_helper: !input car_max_current_helper
+  charger_current_ent: !input charger_current_entity
+  panel_power_ent: !input panel_total_power_sensor
+  panel_safe_kw_helper: !input panel_max_safe_kw_helper
+  reason_helper: !input decision_reason_helper
 
+  best_hours: "{{ state_attr(best_hours_ent, 'raw_hours') | default([], true) | list }}"
+  current_time: "{{ now().strftime('%H:00') }}"
+  soc: "{{ states(soc_ent) | float(0) if soc_ent != '' else 0 }}"
+  effective_max_soc: >
+    {% if target_soc_helper != '' and states(target_soc_helper) not in ['unknown', 'unavailable', 'none'] %}
+      {{ states(target_soc_helper) | float(fallback_max_soc) }}
+    {% else %}
+      {{ fallback_max_soc | float(80) }}
+    {% endif %}
+  target_current_a: >
+    {% if max_current_helper != '' and states(max_current_helper) not in ['unknown', 'unavailable', 'none'] %}
+      {{ states(max_current_helper) | int(16) }}
+    {% else %}
+      16
+    {% endif %}
+  safe_limit_kw: >
+    {% if panel_safe_kw_helper != '' and states(panel_safe_kw_helper) not in ['unknown', 'unavailable', 'none'] %}
+      {{ states(panel_safe_kw_helper) | float(15.0) }}
+    {% else %}
+      15.0
+    {% endif %}
+  current_panel_kw: >
+    {% if panel_power_ent != '' and states(panel_power_ent) not in ['unknown', 'unavailable', 'none'] %}
+      {% set raw_val = states(panel_power_ent) | float(0) %}
+      {% set unit = state_attr(panel_power_ent, 'unit_of_measurement') | default('kW', true) %}
+      {{ (raw_val / 1000.0) if unit == 'W' else raw_val }}
+    {% else %}
+      0.0
+    {% endif %}
+
+action:
   - choose:
-      # 1. Jos akku on jo täynnä asetetun rajan yli, pidä laturi poissa päältä
-      - conditions: "{{ !input car_battery_sensor != '' and soc >= max_soc }}"
+      # 1. TURVARAJA (Safety): Jos valitun ryhmä- tai pääkeskuksen teho ylittää turvarajan, keskeytä lataus välittömästi
+      - conditions:
+          - condition: template
+            value_template: "{{ panel_power_ent != '' and current_panel_kw > safe_limit_kw }}"
         sequence:
           - service: homeassistant.turn_off
             target:
               entity_id: !input charger_entity
+          - if:
+              - condition: template
+                value_template: "{{ reason_helper != '' }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input decision_reason_helper
+                data:
+                  value: "EV-lataus keskeytetty: keskuksen teho {{ current_panel_kw | round(1) }} kW ylittää rajan {{ safe_limit_kw }} kW."
 
-      # 2. HINTA-OPTIMOINTI: Jos nyt ollaan AI-Sähkövahdin parhailla tunneilla, käynnistä lataus
-      - conditions: "{{ current_time in best_hours }}"
+      # 2. AKKU TÄYNNÄ: Jos akku on saavuttanut aktiivisen autoprofiilin tavoitetason, pidä laturi pois päältä
+      - conditions:
+          - condition: template
+            value_template: "{{ soc_ent != '' and soc >= effective_max_soc }}"
         sequence:
+          - service: homeassistant.turn_off
+            target:
+              entity_id: !input charger_entity
+          - if:
+              - condition: template
+                value_template: "{{ reason_helper != '' }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input decision_reason_helper
+                data:
+                  value: "EV-lataus valmis: varaustaso {{ soc }} % saavutti rajan {{ effective_max_soc }} %."
+
+      # 3. HINTA-OPTIMOINTI: Jos nyt on AI-Sähkövahdin halpa tunti, aseta profiilin virta ja käynnistä lataus
+      - conditions:
+          - condition: template
+            value_template: "{{ current_time in best_hours }}"
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ charger_current_ent != '' and max_current_helper != '' }}"
+            then:
+              - service: number.set_value
+                target:
+                  entity_id: !input charger_current_entity
+                data:
+                  value: "{{ target_current_a }}"
           - service: homeassistant.turn_on
             target:
               entity_id: !input charger_entity
+          - if:
+              - condition: template
+                value_template: "{{ reason_helper != '' }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input decision_reason_helper
+                data:
+                  value: "EV-lataus käynnissä ({{ current_time }}): profiilin virta {{ target_current_a }} A, tavoite {{ effective_max_soc }} %."
 
     default:
-      # Muina tunteina lataus on keskeytetty
+      # 4. Muina tunteina lataus on keskeytetty
       - service: homeassistant.turn_off
         target:
           entity_id: !input charger_entity
