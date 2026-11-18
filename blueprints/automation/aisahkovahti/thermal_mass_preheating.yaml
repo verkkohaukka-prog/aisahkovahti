@@ -1,10 +1,10 @@
 blueprint:
-  name: "AI-Sähkövahti: Rakenteiden Ennakoiva Esilämmitys (Thermal Pre-heating)"
-  description: "Lämmittää rakenteita (lattialämmitys tai ilmalämpöpumppu) +2–5 °C normaalia enemmän AI-Sähkövahdin edullisina tunneina, erityisesti ennen ennakoitua kylmää jaksoa."
+  name: "AI-Sähkövahti: Rakenteiden Ennakoiva Esilämmitys (Profiili-, Hinta- & Mukavuusrajat)"
+  description: "Ohjaa vyöhykkeen (ILP, VILP tai lattialämmitys) lämmitystä halpojen tuntien, senttihintakaton, hintapiikkivaroituksen sekä käyttäjän määrittelemien ylä- ja alalämpötilarajojen mukaisesti."
   domain: automation
   input:
     climate_entity:
-      name: Lämmityslaite (Climate - Ilmalämpöpumppu tai termostaatti)
+      name: Lämmityslaite / Vyöhyke (Climate - ILP, VILP tai termostaatti)
       selector:
         entity:
           domain: climate
@@ -13,21 +13,102 @@ blueprint:
       selector:
         entity:
           domain: sensor
+    base_temperature:
+      name: Haluttu normaali peruslämpötila (°C)
+      description: "Käyttäjän valitsema normaali sisälämpötila tälle vyöhykkeelle (esim. 20.5 tai 22.0 °C)."
+      default: 21.0
+      selector:
+        number:
+          min: 12.0
+          max: 26.0
+          step: 0.5
+          unit_of_measurement: "°C"
     temp_boost_amount:
-      name: Lämpötilan nosto esilämmityksen aikana (°C)
+      name: Lämpötilan nosto halpoina tunteina (°C)
+      description: "Kuinka monta astetta peruslämpötilaa nostetaan esilämmityksen aikana."
       default: 2.0
       selector:
         number:
-          min: 1.0
-          max: 5.0
+          min: 0.5
+          max: 6.0
           step: 0.5
           unit_of_measurement: "°C"
-    spike_warning_sensor:
-      name: AI-Sähkövahti Hintapiikkivaroitus-sensori (valinnainen)
+    max_target_temperature:
+      name: Sallittu maksimilämpötila esilämmityksessä (°C)
+      description: "Yläraja, johon asti lämpötilaa saa enintään nostaa halvoilla tunneilla tai ennen hintapiikkiä."
+      default: 24.0
+      selector:
+        number:
+          min: 16.0
+          max: 28.0
+          step: 0.5
+          unit_of_measurement: "°C"
+    min_comfort_temperature:
+      name: Alin lämpötila, joka pidetään hinnasta huolimatta (°C)
+      description: "Vyöhykkeen ehdoton alaraja (esim. ylä- tai alakerran mukavuusraja), jonka alle lämpöä ei lasketa edes huippuhintojen aikana."
+      default: 19.0
+      selector:
+        number:
+          min: 10.0
+          max: 24.0
+          step: 0.5
+          unit_of_measurement: "°C"
+    spot_price_sensor:
+      name: Nykyinen sähkön hinta -sensori (snt/kWh) (valinnainen)
+      description: "Valitse sähkön nykyisen hinnan sensori, jos haluat käyttää maksimi senttihintarajaa."
       default: ""
       selector:
         entity:
           domain: sensor
+    max_price_cents:
+      name: Maksimi senttihinta massalämmitykselle (snt/kWh)
+      description: "Jos sähkön hinta ylittää tämän rajan, esilämmitys katkaistaan ja siirrytään alimpaan mukavuusrajaan."
+      default: 15.0
+      selector:
+        number:
+          min: 0.0
+          max: 200.0
+          step: 0.5
+          unit_of_measurement: "snt/kWh"
+    spike_warning_sensor:
+      name: AI-Sähkövahti Hintapiikkivaroitus-sensori (valinnainen)
+      description: "Jos päällä, tehostaa esilämmitystä +0.5 °C (enintään sallittuun maksimilämpötilaan asti)."
+      default: ""
+      selector:
+        entity:
+          domain: sensor
+    outdoor_temp_sensor:
+      name: Ulkolämpötila-sensori (valinnainen - COP/SCOP-pakkasraja)
+      description: "Estää pumpun ylikuormituksen kovalla pakkasella, kun COP-hyötysuhde laskee."
+      default: ""
+      selector:
+        entity:
+          domain: sensor
+          device_class: temperature
+    min_outdoor_temp_for_boost:
+      name: Alin ulkolämpötila esilämmitykselle (°C)
+      description: "Jos ulkolämpötila on tätä kylmempi, esilämmityksen lisänosto ohitetaan."
+      default: -15.0
+      selector:
+        number:
+          min: -35.0
+          max: 5.0
+          step: 1.0
+          unit_of_measurement: "°C"
+    floor_fault_alert_entity:
+      name: Lämmityspiirin vikahälytys-lukitus (valinnainen)
+      description: "Jos päällä (esim. input_boolean.floor_fault_alert), estää pumpun ylikuormituksen rajoittamalla lisänoston."
+      default: ""
+      selector:
+        entity:
+          domain: input_boolean
+    decision_reason_helper:
+      name: Audit-lokin syyteksti-helper (valinnainen)
+      description: "Kirjaa päätöksen perustelun (esim. input_text.last_decision_reason)."
+      default: ""
+      selector:
+        entity:
+          domain: input_text
 
 mode: single
 
@@ -37,28 +118,125 @@ trigger:
   - platform: state
     entity_id: !input best_hours_sensor
 
-action:
-  - variables:
-      best_hours: "{{ state_attr(states['!input best_hours_sensor'].entity_id, 'raw_hours') | list }}"
-      current_time: "{{ now().strftime('%H:00') }}"
-      boost: !input temp_boost_amount
-      # Haetaan laitteen nykyinen peruslämpötila tai käytetään oletusta
-      current_target: "{{ state_attr(states['!input climate_entity'].entity_id, 'temperature') | float(21) }}"
+variables:
+  climate_ent: !input climate_entity
+  best_hours_ent: !input best_hours_sensor
+  base_temp: !input base_temperature
+  boost: !input temp_boost_amount
+  max_temp_cap: !input max_target_temperature
+  min_comfort_temp: !input min_comfort_temperature
+  price_ent: !input spot_price_sensor
+  max_price_limit: !input max_price_cents
+  spike_ent: !input spike_warning_sensor
+  outdoor_ent: !input outdoor_temp_sensor
+  min_outdoor_temp: !input min_outdoor_temp_for_boost
+  fault_alert_ent: !input floor_fault_alert_entity
+  reason_helper: !input decision_reason_helper
 
+  best_hours: "{{ state_attr(best_hours_ent, 'raw_hours') | default([], true) | list }}"
+  current_time: "{{ now().strftime('%H:00') }}"
+
+  # Nykyisen hinnan lukeminen (muuntaa automaattisesti €/kWh -> snt/kWh jos yksikkö on EUR)
+  current_price_cents: >
+    {% if price_ent != '' and states(price_ent) not in ['unknown', 'unavailable', 'none'] %}
+      {% set raw_p = states(price_ent) | float(0) %}
+      {% set unit = state_attr(price_ent, 'unit_of_measurement') | default('snt/kWh', true) | lower %}
+      {{ (raw_p * 100.0) if ('eur' in unit or '€' in unit) else raw_p }}
+    {% else %}
+      0.0
+    {% endif %}
+  is_price_too_high: "{{ price_ent != '' and current_price_cents > (max_price_limit | float(15.0)) }}"
+
+  outdoor_temp: >
+    {% if outdoor_ent != '' and states(outdoor_ent) not in ['unknown', 'unavailable', 'none'] %}
+      {{ states(outdoor_ent) | float(0) }}
+    {% else %}
+      0.0
+    {% endif %}
+  is_too_cold_for_cop: "{{ outdoor_ent != '' and outdoor_temp < (min_outdoor_temp | float(-15.0)) }}"
+  is_fault_active: "{{ fault_alert_ent != '' and is_state(fault_alert_ent, 'on') }}"
+
+  is_spike_coming: >
+    {% if spike_ent != '' and states(spike_ent) not in ['unknown', 'unavailable', 'none'] %}
+      {{ states(spike_ent) | lower in ['on', 'true', 'high', 'varoitus', '1'] }}
+    {% else %}
+      false
+    {% endif %}
+
+  # Lasketaan esilämmityksen tavoitelämpötila huomioiden käyttäjän asettama yläraja (max_temp_cap) ja alaraja (min_comfort_temp)
+  effective_boost: "{{ (boost | float(2.0)) + (0.5 if is_spike_coming else 0.0) }}"
+  raw_boost_temp: "{{ (base_temp | float(21.0)) + effective_boost }}"
+  capped_boost_temp: "{{ [[raw_boost_temp, max_temp_cap | float(24.0)] | min, min_comfort_temp | float(19.0)] | max }}"
+  safe_base_temp: "{{ [base_temp | float(21.0), min_comfort_temp | float(19.0)] | max }}"
+
+action:
   - choose:
-      # JOS nyt ollaan AI-Sähkövahdin parhailla tunneilla -> Nostetaan lämpötilaa (esilämmitetään rakenteita)
-      - conditions: "{{ current_time in best_hours }}"
+      # 1. HINTA YLITTÄÄ MAKSIMI SENTTIHINNAN: Massalämmitys pois päältä -> pidetään alin mukavuuslämpötila
+      - conditions:
+          - condition: template
+            value_template: "{{ is_price_too_high }}"
         sequence:
           - service: climate.set_temperature
             target:
               entity_id: !input climate_entity
             data:
-              temperature: "{{ current_target + boost }}"
+              temperature: "{{ min_comfort_temp }}"
+          - if:
+              - condition: template
+                value_template: "{{ reason_helper != '' }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input decision_reason_helper
+                data:
+                  value: "Massalämmitys seis ({{ climate_ent }}): hinta {{ current_price_cents | round(1) }} snt ylittää rajan {{ max_price_limit }} snt -> mukavuusraja {{ min_comfort_temp }} °C."
 
-    default:
-      # Muina tunteina palautetaan normaaliin tavoitelämpötilaan (vähennetään boost pois)
-      - service: climate.set_temperature
+      # 2. TURVALUKITUS: Lämmityspiirivika tai liian kova pakkanen COP-käyrälle -> pidetään normaali peruslämpö
+      - conditions:
+          - condition: template
+            value_template: "{{ current_time in best_hours and (is_fault_active or is_too_cold_for_cop) }}"
+        sequence:
+          - service: climate.set_temperature
             target:
               entity_id: !input climate_entity
             data:
-              temperature: "{{ current_target - boost if current_target > 18 else current_target }}"
+              temperature: "{{ safe_base_temp }}"
+          - if:
+              - condition: template
+                value_template: "{{ reason_helper != '' }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input decision_reason_helper
+                data:
+                  value: >
+                    Esilämmitys ohitettu ({{ climate_ent }}):
+                    {{ 'lämmityspiirin vikahälytys aktiivinen' if is_fault_active else 'ulkolämpötila ' ~ outdoor_temp ~ ' °C alle COP-rajan ' ~ min_outdoor_temp ~ ' °C' }} -> peruslämpö {{ safe_base_temp }} °C.
+
+      # 3. HINTA-OPTIMOINTI (ja ei ylitä hintakattoa): Nostetaan lämpötilaa enintään sallittuun maksimirajaan asti
+      - conditions:
+          - condition: template
+            value_template: "{{ current_time in best_hours }}"
+        sequence:
+          - service: climate.set_temperature
+            target:
+              entity_id: !input climate_entity
+            data:
+              temperature: "{{ capped_boost_temp }}"
+          - if:
+              - condition: template
+                value_template: "{{ reason_helper != '' }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input decision_reason_helper
+                data:
+                  value: "Esilämmitys aktiivinen ({{ climate_ent }}): tavoite {{ capped_boost_temp }} °C (maksimi {{ max_temp_cap }} °C)."
+
+    default:
+      # 4. Muina tunteina palautetaan käyttäjän valitsemaan peruslämpötilaan (vähintään mukavuusrajaan)
+      - service: climate.set_temperature
+        target:
+          entity_id: !input climate_entity
+        data:
+          temperature: "{{ safe_base_temp }}"
