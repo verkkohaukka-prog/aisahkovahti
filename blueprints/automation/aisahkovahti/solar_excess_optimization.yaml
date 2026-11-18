@@ -1,20 +1,45 @@
 blueprint:
-  name: "AI-Sähkövahti: Aurinkosähkön Ylijäämän Ohjaus"
-  description: "Ohjaa aurinkopaneelien ylijäämäsähkön veden lämmitykseen tai muihin kuormiin, kun kotiakusto on täynnä."
+  name: "AI-Sähkövahti: Aurinkosähkön Ylijäämän Ohjaus (Profiili-, Hystereesi- & Turvatuki)"
+  description: "Ohjaa aurinkopaneelien ylijäämäsähkön veden lämmitykseen, sähköautolle tai muihin kuormiin, kun kotiakusto on saavuttanut tavoitetasonsa. Sisältää hystereesin (estää releen raksutuksen) ja keskuksen sulakesuojan."
   domain: automation
   input:
     solar_production_sensor:
-      name: Aurinkosähkön nykyinen tuotanto (W)
+      name: Aurinkosähkön nykyinen tuotanto (W tai kW)
       selector:
         entity:
           domain: sensor
           device_class: power
     home_consumption_sensor:
-      name: Talon hetkellinen kokonaiskulutus (W)
+      name: Talon hetkellinen kokonaiskulutus (W tai kW)
       selector:
         entity:
           domain: sensor
           device_class: power
+    target_appliance_switch:
+      name: Ohjattava laite (esim. Lämminvesivaraaja / Vastus / Laturi)
+      selector:
+        entity:
+          domain: switch
+    excess_threshold:
+      name: Ylijäämän raja-arvo käynnistykselle (W)
+      description: "Kuinka paljon ylijäämätuotantoa vaaditaan ennen kuin kuorma kytketään päälle."
+      default: 1000
+      selector:
+        number:
+          min: 200
+          max: 10000
+          step: 100
+          unit_of_measurement: "W"
+    stop_import_threshold:
+      name: Sammutusraja / Suurin sallittu ostoteho verkosta (W) (Hystereesi)
+      description: "Estää releen edestakaisen napsumisen: kuorma sammutetaan vasta, kun verkon ostoteho ylittää tämän rajan."
+      default: 500
+      selector:
+        number:
+          min: 0
+          max: 5000
+          step: 100
+          unit_of_measurement: "W"
     battery_soc_sensor:
       name: Kotiakuston varaustaso % (valinnainen)
       default: ""
@@ -22,20 +47,30 @@ blueprint:
         entity:
           domain: sensor
           device_class: battery
-    target_appliance_switch:
-      name: Ohjattava laite (esim. Lämminvesivaraaja / Vastus)
-      selector:
-        entity:
-          domain: switch
-    excess_threshold:
-      name: Ylijäämän raja-arvo käynnistykselle (W)
-      default: 1000
+    min_battery_soc:
+      name: Kotiakuston minimivaraus ennen ylijäämäohjausta (%)
+      description: "Ylijäämä ohjataan kuormalle vasta, kun kotiakusto on latautunut vähintään tähän tasoon."
+      default: 95
       selector:
         number:
-          min: 200
-          max: 5000
-          step: 100
-          unit_of_measurement: "W"
+          min: 50
+          max: 100
+          step: 5
+          unit_of_measurement: "%"
+    panel_max_safe_kw_helper:
+      name: Ryhmä- tai pääkeskuksen turvatehoraja-helper (kW) (valinnainen)
+      description: "Turvaraja (esim. input_number.house_max_safe_kw), jonka ylittyessä kuorma katkaistaan aina."
+      default: ""
+      selector:
+        entity:
+          domain: input_number
+    decision_reason_helper:
+      name: Audit-lokin syyteksti-helper (valinnainen)
+      description: "Kirjaa päätöksen perustelun (esim. input_text.last_decision_reason)."
+      default: ""
+      selector:
+        entity:
+          domain: input_text
 
 mode: single
 
@@ -44,27 +79,111 @@ trigger:
     entity_id: !input solar_production_sensor
   - platform: state
     entity_id: !input home_consumption_sensor
+  - platform: time_pattern
+    minutes: "/2"
+
+variables:
+  solar_ent: !input solar_production_sensor
+  consumption_ent: !input home_consumption_sensor
+  appliance_ent: !input target_appliance_switch
+  start_excess_w: !input excess_threshold
+  stop_import_w: !input stop_import_threshold
+  battery_ent: !input battery_soc_sensor
+  min_batt_soc: !input min_battery_soc
+  panel_safe_kw_helper: !input panel_max_safe_kw_helper
+  reason_helper: !input decision_reason_helper
+
+  # Muunnetaan tuotanto ja kulutus aina wateiksi (W) yksiköstä riippumatta
+  solar_w: >
+    {% set val = states(solar_ent) | float(0) %}
+    {% set unit = state_attr(solar_ent, 'unit_of_measurement') | default('W', true) | lower %}
+    {{ (val * 1000.0) if 'kw' in unit else val }}
+  consumption_w: >
+    {% set val = states(consumption_ent) | float(0) %}
+    {% set unit = state_attr(consumption_ent, 'unit_of_measurement') | default('W', true) | lower %}
+    {{ (val * 1000.0) if 'kw' in unit else val }}
+
+  # Positiivinen = ylijäämää verkkoon, negatiivinen = ostosähköä verkosta
+  net_excess_w: "{{ solar_w - consumption_w }}"
+  current_consumption_kw: "{{ consumption_w / 1000.0 }}"
+  is_appliance_on: "{{ is_state(appliance_ent, 'on') }}"
+
+  battery_soc: >
+    {% if battery_ent != '' and states(battery_ent) not in ['unknown', 'unavailable', 'none'] %}
+      {{ states(battery_ent) | float(100) }}
+    {% else %}
+      100.0
+    {% endif %}
+  is_battery_ready: "{{ battery_soc >= (min_batt_soc | float(95)) }}"
+
+  safe_limit_kw: >
+    {% if panel_safe_kw_helper != '' and states(panel_safe_kw_helper) not in ['unknown', 'unavailable', 'none'] %}
+      {{ states(panel_safe_kw_helper) | float(15.0) }}
+    {% else %}
+      15.0
+    {% endif %}
+  is_panel_overloaded: "{{ panel_safe_kw_helper != '' and current_consumption_kw > safe_limit_kw }}"
 
 action:
-  - variables:
-      solar: "{{ states(states['!input solar_production_sensor'].entity_id) | float(0) }}"
-      consumption: "{{ states(states['!input home_consumption_sensor'].entity_id) | float(0) }}"
-      battery_soc: "{{ states(states['!input battery_soc_sensor'].entity_id) | float(100) if !input battery_soc_sensor != '' else 100 }}"
-      threshold: !input excess_threshold
-      excess_power: "{{ solar - consumption }}"
-
   - choose:
-      # JOS akku on täynnä (tai ei akkua) JA ylijäämää on enemmän kuin kynnysarvo
+      # 1. SULAKESUOJA (Safety): Jos keskuksen kulutus ylittää turvarajan, katkaise kuorma välittömästi
       - conditions:
-          - "{{ battery_soc >= 95 }}"
-          - "{{ excess_power >= threshold }}"
+          - condition: template
+            value_template: "{{ is_panel_overloaded }}"
+        sequence:
+          - service: homeassistant.turn_off
+            target:
+              entity_id: !input target_appliance_switch
+          - if:
+              - condition: template
+                value_template: "{{ reason_helper != '' }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input decision_reason_helper
+                data:
+                  value: "Aurinkokuorma katkaistu: keskuksen kulutus {{ current_consumption_kw | round(1) }} kW ylittää turvarajan {{ safe_limit_kw }} kW."
+
+      # 2. KÄYNNISTYS: Akku on valmis JA ylijäämää on vähintään käynnistyskynnyksen verran
+      - conditions:
+          - condition: template
+            value_template: "{{ not is_appliance_on and is_battery_ready and net_excess_w >= (start_excess_w | float(1000)) }}"
         sequence:
           - service: homeassistant.turn_on
             target:
               entity_id: !input target_appliance_switch
+          - if:
+              - condition: template
+                value_template: "{{ reason_helper != '' }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input decision_reason_helper
+                data:
+                  value: "Aurinkokuorma käynnistetty: ylijäämä {{ net_excess_w | round(0) }} W, akusto {{ battery_soc }} %."
+
+      # 3. PITOTILA (Hystereesi): Kuorma on jo päällä, akusto riittävän täynnä eikä verkon ostoteho ylitä sammutusrajaa
+      - conditions:
+          - condition: template
+            value_template: "{{ is_appliance_on and battery_soc >= ((min_batt_soc | float(95)) - 5.0) and net_excess_w >= -(stop_import_w | float(500)) }}"
+        sequence:
+          - stop: "Pidetään aurinkokuorma vakaana päällä hystereesialueella."
 
     default:
-      # Muussa tapauksessa vapautetaan kuorma normaaliin pörssisähköohjaukseen
-      - service: homeassistant.turn_off
-        target:
-          entity_id: !input target_appliance_switch
+      # 4. SAMMUTUS: Ei riittävästi ylijäämää tai akusto vaatii latausta -> sammutetaan kuorma
+      - if:
+          - condition: template
+            value_template: "{{ is_appliance_on }}"
+        then:
+          - service: homeassistant.turn_off
+            target:
+              entity_id: !input target_appliance_switch
+          - if:
+              - condition: template
+                value_template: "{{ reason_helper != '' }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input decision_reason_helper
+                data:
+                  value: "Aurinkokuorma sammutettu: nettoylijäämä {{ net_excess_w | round(0) }} W (ostoraja {{ stop_import_w }} W)."
