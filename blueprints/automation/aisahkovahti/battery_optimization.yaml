@@ -1,10 +1,10 @@
 blueprint:
-  name: "AI-Sähkövahti: Kotiakuston Älyohjaus"
-  description: "Lataa kotiakustoa AI-Sähkövahdin edullisina tunteina ja optimoi purkua/verkkosyöttöä hintahuippujen välttämiseksi."
+  name: "AI-Sähkövahti: Kotiakuston & UPS-varavirran Älyohjaus (Profiilituki)"
+  description: "Lataa kotiakustoa AI-Sähkövahdin edullisina tunteina huomioiden pääsulakkeiden turvatehorajan, ja optimoi purkua hintahuippujen aikana säilyttäen aina määritellyn UPS-varavirtatason."
   domain: automation
   input:
     battery_mode_select:
-      name: Invertterin toimintatila (Select-entiteetti tai kytkin)
+      name: Invertterin toimintatila (Select-entiteetti tai Switch)
       selector:
         entity:
           domain: ["select", "switch"]
@@ -18,6 +18,74 @@ blueprint:
       selector:
         entity:
           domain: sensor
+    charge_option:
+      name: Invertterin lataustilan nimi (Select-entiteetille)
+      description: "Invertterimerkin mukainen tila verkkolataukselle (esim. Charge, Force Charge tai Grid Charge)."
+      default: "Charge"
+      selector:
+        text:
+    discharge_option:
+      name: Invertterin purku- / omakäyttötilan nimi (Select-entiteetille)
+      description: "Invertterimerkin mukainen tila hintapiikin ajalle (esim. Discharge tai Max Self-Consumption)."
+      default: "Discharge"
+      selector:
+        text:
+    default_option:
+      name: Invertterin normaalitilan nimi (Select-entiteetille)
+      description: "Invertterin normaali perusasetus muina tunteina (esim. Auto tai Self-Use)."
+      default: "Auto"
+      selector:
+        text:
+    battery_soc_sensor:
+      name: Kotiakuston varaustaso % (valinnainen - UPS-varavirtasuoja)
+      description: "Mahdollistaa UPS-reservirajan (minimi-SoC) ja latauksen ylärajan valvonnan."
+      default: ""
+      selector:
+        entity:
+          domain: sensor
+          device_class: battery
+    min_backup_soc:
+      name: UPS-varavirtaraja / Alin sallittu varaustaso (%)
+      description: "Estää akun purkamisen tämän rajan alle, jotta sähkökatkon varalle jää aina reserviä."
+      default: 20
+      selector:
+        number:
+          min: 5
+          max: 80
+          step: 5
+          unit_of_measurement: "%"
+    max_charge_soc:
+      name: Akuston tavoitevaraus verkkolatauksessa (%)
+      description: "Lopettaa pakotetun verkkolatauksen, kun akku on saavuttanut tämän tason."
+      default: 95
+      selector:
+        number:
+          min: 50
+          max: 100
+          step: 5
+          unit_of_measurement: "%"
+    panel_total_power_sensor:
+      name: Ryhmä- tai pääkeskuksen kokonaisteho (kW tai W) (valinnainen)
+      description: "Estää pääsulakkeiden ylikuormituksen verkkolatauksen aikana."
+      default: ""
+      selector:
+        entity:
+          domain: sensor
+          device_class: power
+    panel_max_safe_kw_helper:
+      name: Ryhmä- tai pääkeskuksen turvatehoraja-helper (kW) (valinnainen)
+      description: "Esim. input_number.house_max_safe_kw (oletus 15.0 kW)."
+      default: ""
+      selector:
+        entity:
+          domain: input_number
+    decision_reason_helper:
+      name: Audit-lokin syyteksti-helper (valinnainen)
+      description: "Kirjaa päätöksen perustelun (esim. input_text.last_decision_reason)."
+      default: ""
+      selector:
+        entity:
+          domain: input_text
 
 mode: single
 
@@ -29,35 +97,148 @@ trigger:
   - platform: state
     entity_id: !input spike_warning_sensor
 
+variables:
+  mode_ent: !input battery_mode_select
+  best_hours_ent: !input best_hours_sensor
+  spike_ent: !input spike_warning_sensor
+  opt_charge: !input charge_option
+  opt_discharge: !input discharge_option
+  opt_default: !input default_option
+  soc_ent: !input battery_soc_sensor
+  min_soc: !input min_backup_soc
+  max_soc: !input max_charge_soc
+  panel_power_ent: !input panel_total_power_sensor
+  panel_safe_kw_helper: !input panel_max_safe_kw_helper
+  reason_helper: !input decision_reason_helper
+
+  is_select_domain: "{{ mode_ent.startswith('select.') }}"
+  best_hours: "{{ state_attr(best_hours_ent, 'raw_hours') | default([], true) | list }}"
+  current_time: "{{ now().strftime('%H:00') }}"
+  spike_active: "{{ states(spike_ent) | lower in ['true', 'on', 'high', 'varoitus', '1'] }}"
+
+  battery_soc: >
+    {% if soc_ent != '' and states(soc_ent) not in ['unknown', 'unavailable', 'none'] %}
+      {{ states(soc_ent) | float(50) }}
+    {% else %}
+      50.0
+    {% endif %}
+  is_ups_reserve_low: "{{ soc_ent != '' and battery_soc <= (min_soc | float(20)) }}"
+  is_battery_full: "{{ soc_ent != '' and battery_soc >= (max_soc | float(95)) }}"
+
+  safe_limit_kw: >
+    {% if panel_safe_kw_helper != '' and states(panel_safe_kw_helper) not in ['unknown', 'unavailable', 'none'] %}
+      {{ states(panel_safe_kw_helper) | float(15.0) }}
+    {% else %}
+      15.0
+    {% endif %}
+  current_panel_kw: >
+    {% if panel_power_ent != '' and states(panel_power_ent) not in ['unknown', 'unavailable', 'none'] %}
+      {% set raw_val = states(panel_power_ent) | float(0) %}
+      {% set unit = state_attr(panel_power_ent, 'unit_of_measurement') | default('kW', true) %}
+      {{ (raw_val / 1000.0) if unit == 'W' else raw_val }}
+    {% else %}
+      0.0
+    {% endif %}
+  is_panel_overloaded: "{{ panel_power_ent != '' and current_panel_kw > safe_limit_kw }}"
+
 action:
-  - variables:
-      best_hours: "{{ state_attr(states['!input best_hours_sensor'].entity_id, 'raw_hours') | list }}"
-      current_time: "{{ now().strftime('%H:00') }}"
-      spike_active: "{{ is_state(states['!input spike_warning_sensor'].entity_id, 'true') or is_state(states['!input spike_warning_sensor'].entity_id, 'True') }}"
-
   - choose:
-      # 1. HALVAT TUNNIT: Pakotetaan akku lataukseen verkosta/aurangosta edullisella hinnalla
-      - conditions: "{{ current_time in best_hours }}"
+      # 1. SULAKESUOJA (Safety): Jos keskuksen teho ylittää turvarajan, estetään verkkolataus ja palataan normaalitilaan
+      - conditions:
+          - condition: template
+            value_template: "{{ current_time in best_hours and is_panel_overloaded }}"
         sequence:
-          - service: select.select_option
-            target:
-              entity_id: !input battery_mode_select
-            data:
-              option: "Charge" # Huom. Muuta invertterimerkkisi mukaiseksi (es. Force Charge / Grid Charge)
+          - if:
+              - condition: template
+                value_template: "{{ is_select_domain }}"
+            then:
+              - service: select.select_option
+                target:
+                  entity_id: !input battery_mode_select
+                data:
+                  option: "{{ opt_default }}"
+            else:
+              - service: homeassistant.turn_off
+                target:
+                  entity_id: !input battery_mode_select
+          - if:
+              - condition: template
+                value_template: "{{ reason_helper != '' }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input decision_reason_helper
+                data:
+                  value: "Akuston verkkolataus estetty: keskuksen teho {{ current_panel_kw | round(1) }} kW ylittää rajan {{ safe_limit_kw }} kW."
 
-      # 2. HINTAPIIKKI / KALLIS TUNTI: Puretaan akkua / estetään verkkosähkön käyttö (Self-consumption / Backup mode)
-      - conditions: "{{ spike_active }}"
+      # 2. HALVAT TUNNIT: Ladataan akkua edullisella hinnalla tavoitetasoon asti
+      - conditions:
+          - condition: template
+            value_template: "{{ current_time in best_hours and not is_battery_full }}"
         sequence:
-          - service: select.select_option
-            target:
-              entity_id: !input battery_mode_select
-            data:
-              option: "Discharge" # Tai Backup / Max Self-Consumption
+          - if:
+              - condition: template
+                value_template: "{{ is_select_domain }}"
+            then:
+              - service: select.select_option
+                target:
+                  entity_id: !input battery_mode_select
+                data:
+                  option: "{{ opt_charge }}"
+            else:
+              - service: homeassistant.turn_on
+                target:
+                  entity_id: !input battery_mode_select
+          - if:
+              - condition: template
+                value_template: "{{ reason_helper != '' }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input decision_reason_helper
+                data:
+                  value: "Akusto lataustilassa ({{ current_time }}): varaustaso {{ battery_soc }} % / tavoite {{ max_soc }} %."
+
+      # 3. HINTAPIIKKI / KALLIS TUNTI: Puretaan akkua hintapiikin välttämiseksi (kunhan UPS-varavirtaraja ei alitu)
+      - conditions:
+          - condition: template
+            value_template: "{{ spike_active and not is_ups_reserve_low }}"
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ is_select_domain }}"
+            then:
+              - service: select.select_option
+                target:
+                  entity_id: !input battery_mode_select
+                data:
+                  option: "{{ opt_discharge }}"
+            else:
+              - service: homeassistant.turn_off
+                target:
+                  entity_id: !input battery_mode_select
+          - if:
+              - condition: template
+                value_template: "{{ reason_helper != '' }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input decision_reason_helper
+                data:
+                  value: "Akusto purkutilassa (hintapiikki): varaustaso {{ battery_soc }} % (UPS-raja {{ min_soc }} %)."
 
     default:
-      # Normaalitila / Älykäs perusasetus
-      - service: select.select_option
-        target:
-          entity_id: !input battery_mode_select
-        data:
-          option: "Auto"
+      # 4. NORMAALITILA (tai UPS-reservin suojaus): Palautetaan invertteri älykkääseen perusasetukseen
+      - if:
+          - condition: template
+            value_template: "{{ is_select_domain }}"
+        then:
+          - service: select.select_option
+            target:
+              entity_id: !input battery_mode_select
+            data:
+              option: "{{ opt_default }}"
+        else:
+          - service: homeassistant.turn_off
+            target:
+              entity_id: !input battery_mode_select
