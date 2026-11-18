@@ -1,0 +1,20 @@
+# Kiinteistön turvarajat ja lukitukset (VIP-kaavakkeen kohta 6)
+safety:
+  global:
+    main_fuse_a: 25                  # Esim. 3x25A
+    max_total_kw: 17.25              # 3 * 230V * 25A = 17.25 kW
+    safe_margin_kw: 15.0             # Raja, jonka yli uusia kuormia ei kytketä
+    max_step_kw_per_min: 3.0         # Kuormanmuutoksen nopeusraja
+    watchdog_timeout_s: 60
+    dry_run: false                   # true = simuloi päätökset ilman releohjausta
+    require_confirm_for:
+      - car_max_current
+      - car_target_soc
+      - floor_surface_temp
+  interlocks:
+    - id: floor_fault_ilp_protection
+      condition: "floor_fault_alert == on"
+      action: "limit_ilp_max_kw: 3.0"
+    - id: main_fuse_ev_block
+      condition: "total_house_kw > 14.0"
+      action: "pause_or_limit_ev_charging"
