@@ -1,0 +1,35 @@
+# Lämpöpumppujen vyöhykeprofiilit (VIP-kaavakkeen kohta 2)
+heat_pumps:
+  - id: ilp_1
+    name: "ILP 1 – Alakerta"
+    type: ilp
+    zone: alakerta
+    climate_entity: climate.ilp_alakerta
+    scop: 4.6
+    nominal_kw: 2.5
+    min_kw: 0.9
+    max_kw: 5.0
+    heat_load_w_per_k: 55
+    cop_curve:
+      - {outdoor_c: -20, cop: 1.6}
+      - {outdoor_c: -15, cop: 1.9}
+      - {outdoor_c: -5,  cop: 2.8}
+      - {outdoor_c: 5,   cop: 4.2}
+      - {outdoor_c: 15,  cop: 5.5}
+
+  - id: vilp_1
+    name: "VILP – Päälämmitys"
+    type: vilp
+    zone: koko_talo
+    climate_entity: climate.vilp_paalampo
+    scop: 3.9
+    nominal_kw: 6.0
+    min_kw: 1.5
+    max_kw: 12.0
+    heat_load_w_per_k: 80
+    cop_curve:
+      - {outdoor_c: -20, cop: 1.5}
+      - {outdoor_c: -15, cop: 1.8}
+      - {outdoor_c: -5,  cop: 2.5}
+      - {outdoor_c: 5,   cop: 3.8}
+      - {outdoor_c: 15,  cop: 4.8}
