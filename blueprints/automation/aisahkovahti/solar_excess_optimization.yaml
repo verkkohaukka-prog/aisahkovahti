@@ -1,6 +1,6 @@
 blueprint:
-  name: "AI-Sähkövahti: Aurinkosähkön Ylijäämän Ohjaus (Profiili-, Hystereesi- & Turvatuki)"
-  description: "Ohjaa aurinkopaneelien ylijäämäsähkön veden lämmitykseen, sähköautolle tai muihin kuormiin, kun kotiakusto on saavuttanut tavoitetasonsa. Sisältää hystereesin (estää releen raksutuksen) ja keskuksen sulakesuojan."
+  name: "AI-Sähkövahti: Aurinkosähkön Ylijäämän & Halpojen Tuntien Ohjaus (Profiili-, Hystereesi- & Ohitustuki)"
+  description: "Ohjaa aurinkopaneelien ylijäämäsähkön veden lämmitykseen, sähköautolle tai muihin kuormiin, kun kotiakusto on saavuttanut tavoitetasonsa. Tukee lisäksi valinnaisia halpoja tunteja, aikataulua, välitöntä pakko-ohitusta sekä kotiakustorajan ohitusta."
   domain: automation
   input:
     solar_production_sensor:
@@ -40,6 +40,62 @@ blueprint:
           max: 5000
           step: 100
           unit_of_measurement: "W"
+    control_mode:
+      name: Lisäohjaustapa ylijäämän rinnalle (halvat tunnit / aikataulu)
+      description: "Valitse ohjataanko laitetta vain aurinkoylijäämällä vai sallitaanko käyttö myös halvoilla tunneilla tai aikataulussa."
+      default: "Vain aurinkoylijäämä"
+      selector:
+        select:
+          options:
+            - "Vain aurinkoylijäämä"
+            - "Aurinkoylijäämä + halvat tunnit ja hintakatto"
+            - "Aurinkoylijäämä + oma aikataulu"
+            - "Aurinkoylijäämä + aikataulu ja halvat tunnit"
+    best_hours_sensor:
+      name: AI-Sähkövahti Optimaaliset Tunnit -sensori (valinnainen)
+      default: ""
+      selector:
+        entity:
+          domain: sensor
+    spot_price_sensor:
+      name: Nykyinen sähkön hinta -sensori (snt/kWh) (valinnainen)
+      default: ""
+      selector:
+        entity:
+          domain: sensor
+    max_price_cents:
+      name: Maksimi senttihinta lisäohjaukselle (snt/kWh)
+      default: 8.0
+      selector:
+        number:
+          min: -50.0
+          max: 200.0
+          step: 0.5
+          unit_of_measurement: "snt/kWh"
+    schedule_start:
+      name: Aikataulun alkuaika (jos aikataulu käytössä)
+      default: "00:00:00"
+      selector:
+        time: {}
+    schedule_end:
+      name: Aikataulun loppuaika (jos aikataulu käytössä)
+      default: "06:00:00"
+      selector:
+        time: {}
+    force_override_entity:
+      name: Käyttäjän pakko-ohituskytkin (valinnainen)
+      description: "Kun kytkin on ON, laite käynnistetään heti ylijäämästä ja hinnasta riippumatta (kunhan sulakeraja ei ylity)."
+      default: ""
+      selector:
+        entity:
+          domain: input_boolean
+    bypass_battery_guard_entity:
+      name: Kotiakuston minimirajan ohituskytkin (valinnainen)
+      description: "Kun kytkin on ON, aurinkoylijäämä ohjataan suoraan kuormalle odottamatta kotiakuston täyttymistä."
+      default: ""
+      selector:
+        entity:
+          domain: input_boolean
     battery_soc_sensor:
       name: Kotiakuston varaustaso % (valinnainen)
       default: ""
@@ -49,7 +105,7 @@ blueprint:
           device_class: battery
     min_battery_soc:
       name: Kotiakuston minimivaraus ennen ylijäämäohjausta (%)
-      description: "Ylijäämä ohjataan kuormalle vasta, kun kotiakusto on latautunut vähintään tähän tasoon."
+      description: "Ylijäämä ohjataan kuormalle vasta, kun kotiakusto on latautunut vähintään tähän tasoon (ellei akkuohitus ole päällä)."
       default: 95
       selector:
         number:
@@ -88,12 +144,19 @@ variables:
   appliance_ent: !input target_appliance_switch
   start_excess_w: !input excess_threshold
   stop_import_w: !input stop_import_threshold
+  v_mode: !input control_mode
+  best_hours_ent: !input best_hours_sensor
+  price_ent: !input spot_price_sensor
+  max_price_limit: !input max_price_cents
+  v_sched_start: !input schedule_start
+  v_sched_end: !input schedule_end
+  v_override_ent: !input force_override_entity
+  v_bypass_batt_ent: !input bypass_battery_guard_entity
   battery_ent: !input battery_soc_sensor
   min_batt_soc: !input min_battery_soc
   panel_safe_kw_helper: !input panel_max_safe_kw_helper
   reason_helper: !input decision_reason_helper
 
-  # Muunnetaan tuotanto ja kulutus aina wateiksi (W) yksiköstä riippumatta
   solar_w: >
     {% set val = states(solar_ent) | float(0) %}
     {% set unit = state_attr(solar_ent, 'unit_of_measurement') | default('W', true) | lower %}
@@ -103,10 +166,51 @@ variables:
     {% set unit = state_attr(consumption_ent, 'unit_of_measurement') | default('W', true) | lower %}
     {{ (val * 1000.0) if 'kw' in unit else val }}
 
-  # Positiivinen = ylijäämää verkkoon, negatiivinen = ostosähköä verkosta
   net_excess_w: "{{ solar_w - consumption_w }}"
   current_consumption_kw: "{{ consumption_w / 1000.0 }}"
   is_appliance_on: "{{ is_state(appliance_ent, 'on') }}"
+
+  is_force_override: "{{ v_override_ent != '' and is_state(v_override_ent, 'on') }}"
+  is_bypass_battery: "{{ v_bypass_batt_ent != '' and is_state(v_bypass_batt_ent, 'on') }}"
+
+  best_hours: >
+    {% if best_hours_ent != '' %}
+      {{ state_attr(best_hours_ent, 'raw_hours') | default([], true) | list }}
+    {% else %}
+      []
+    {% endif %}
+  current_hour_str: "{{ now().strftime('%H:00') }}"
+  current_time_str: "{{ now().strftime('%H:%M:%S') }}"
+
+  is_in_schedule: >
+    {% if v_sched_start <= v_sched_end %}
+      {{ v_sched_start <= current_time_str <= v_sched_end }}
+    {% else %}
+      {{ current_time_str >= v_sched_start or current_time_str <= v_sched_end }}
+    {% endif %}
+
+  current_price_cents: >
+    {% if price_ent != '' and states(price_ent) not in ['unknown', 'unavailable', 'none'] %}
+      {% set raw_p = states(price_ent) | float(0) %}
+      {% set unit = state_attr(price_ent, 'unit_of_measurement') | default('snt/kWh', true) | lower %}
+      {{ (raw_p * 100.0) if ('eur' in unit or '€' in unit) else raw_p }}
+    {% else %}
+      0.0
+    {% endif %}
+
+  is_cheap_or_under_cap: >
+    {{ (best_hours_ent != '' and current_hour_str in best_hours) or (price_ent != '' and current_price_cents <= (max_price_limit | float(8.0))) }}
+
+  is_extra_window_ok: >
+    {% if v_mode == 'Aurinkoylijäämä + halvat tunnit ja hintakatto' %}
+      {{ is_cheap_or_under_cap }}
+    {% elif v_mode == 'Aurinkoylijäämä + oma aikataulu' %}
+      {{ is_in_schedule }}
+    {% elif v_mode == 'Aurinkoylijäämä + aikataulu ja halvat tunnit' %}
+      {{ is_in_schedule and is_cheap_or_under_cap }}
+    {% else %}
+      false
+    {% endif %}
 
   battery_soc: >
     {% if battery_ent != '' and states(battery_ent) not in ['unknown', 'unavailable', 'none'] %}
@@ -114,7 +218,7 @@ variables:
     {% else %}
       100.0
     {% endif %}
-  is_battery_ready: "{{ battery_soc >= (min_batt_soc | float(95)) }}"
+  is_battery_ready: "{{ is_bypass_battery or battery_soc >= (min_batt_soc | float(95)) }}"
 
   safe_limit_kw: >
     {% if panel_safe_kw_helper != '' and states(panel_safe_kw_helper) not in ['unknown', 'unavailable', 'none'] %}
@@ -144,7 +248,43 @@ action:
                 data:
                   value: "Aurinkokuorma katkaistu: keskuksen kulutus {{ current_consumption_kw | round(1) }} kW ylittää turvarajan {{ safe_limit_kw }} kW."
 
-      # 2. KÄYNNISTYS: Akku on valmis JA ylijäämää on vähintään käynnistyskynnyksen verran
+      # 2. KÄYTTÄJÄN PAKKO-OHITUS: Käynnistetään kuorma heti ylijäämästä riippumatta
+      - conditions:
+          - condition: template
+            value_template: "{{ is_force_override }}"
+        sequence:
+          - service: homeassistant.turn_on
+            target:
+              entity_id: !input target_appliance_switch
+          - if:
+              - condition: template
+                value_template: "{{ reason_helper != '' }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input decision_reason_helper
+                data:
+                  value: "Aurinkokuorma pakotettu päälle (käyttäjän ohitus)."
+
+      # 3. LISÄOHJAUSIKKUNA (halvat tunnit / hintakatto / aikataulu): Käynnistetään kuorma valitun säännön mukaan
+      - conditions:
+          - condition: template
+            value_template: "{{ is_extra_window_ok }}"
+        sequence:
+          - service: homeassistant.turn_on
+            target:
+              entity_id: !input target_appliance_switch
+          - if:
+              - condition: template
+                value_template: "{{ reason_helper != '' }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input decision_reason_helper
+                data:
+                  value: "Kuorma käynnistetty lisäohjauksella ({{ v_mode }})."
+
+      # 4. AURINKOYLIJÄÄMÄN KÄYNNISTYS: Akku on valmis (tai ohitettu) JA ylijäämää on vähintään käynnistyskynnyksen verran
       - conditions:
           - condition: template
             value_template: "{{ not is_appliance_on and is_battery_ready and net_excess_w >= (start_excess_w | float(1000)) }}"
@@ -162,15 +302,15 @@ action:
                 data:
                   value: "Aurinkokuorma käynnistetty: ylijäämä {{ net_excess_w | round(0) }} W, akusto {{ battery_soc }} %."
 
-      # 3. PITOTILA (Hystereesi): Kuorma on jo päällä, akusto riittävän täynnä eikä verkon ostoteho ylitä sammutusrajaa
+      # 5. PITOTILA (Hystereesi): Kuorma on jo päällä, akusto riittävän täynnä eikä verkon ostoteho ylitä sammutusrajaa
       - conditions:
           - condition: template
-            value_template: "{{ is_appliance_on and battery_soc >= ((min_batt_soc | float(95)) - 5.0) and net_excess_w >= -(stop_import_w | float(500)) }}"
+            value_template: "{{ is_appliance_on and (is_bypass_battery or battery_soc >= ((min_batt_soc | float(95)) - 5.0)) and net_excess_w >= -(stop_import_w | float(500)) }}"
         sequence:
           - stop: "Pidetään aurinkokuorma vakaana päällä hystereesialueella."
 
     default:
-      # 4. SAMMUTUS: Ei riittävästi ylijäämää tai akusto vaatii latausta -> sammutetaan kuorma
+      # 6. SAMMUTUS: Ei riittävästi ylijäämää, lisäikkunaa tai akusto vaatii latausta -> sammutetaan kuorma
       - if:
           - condition: template
             value_template: "{{ is_appliance_on }}"
