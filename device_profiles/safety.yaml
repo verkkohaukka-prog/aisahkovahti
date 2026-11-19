@@ -23,6 +23,26 @@ safety:
       - car_max_current
       - car_target_soc
       - floor_surface_temp
+
+  overrides_and_schedules:
+    allow_user_force_override: true        # Sallii välittömän pakko-ohituksen (esim. EV / sauna)
+    force_override_respects_fuses: true    # Sulakeraja estää ylikuormituksen myös pakko-ohituksessa
+    allow_wh_safety_bypass: true           # Sallii lämminvesivaraajan minimilämpötilan ohituksen
+    allow_ups_reserve_bypass: true         # Sallii UPS-reservirajan ohituksen (minimi 5 %)
+    default_control_mode: "Halvat tunnit ja hintakatto"
+    default_schedule_start: "22:00:00"
+    default_schedule_end: "07:00:00"
+
+  vacation_and_hygiene:
+    max_vacation_days: 180
+    default_vacation_days: 30
+    default_maintenance_temp_c: 10.0
+    allow_outdoor_offset_mode: true
+    default_outdoor_offset_c: 2.0
+    require_disinfection_after_wh_off: true
+    disinfection_target_temp_c: 65.0
+    disinfection_prefer_cheap_hours: true
+
   interlocks:
     - id: floor_fault_ilp_protection
       condition: "floor_fault_alert == on"
@@ -30,3 +50,6 @@ safety:
     - id: panel_fuse_ev_block
       condition: "active_panel_kw > active_panel_safe_margin_kw"
       action: "pause_or_limit_ev_charging"
+    - id: vacation_wh_disinfection_guard
+      condition: "vacation_mode == off and wh_disinfection_needed == on"
+      action: "heat_water_heater_to_disinfection_temp_on_cheap_hours"
