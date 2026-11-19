@@ -8,6 +8,14 @@ input_select:
     initial: "Ei autoa kytketty"
     icon: mdi:car-electric
 
+  aisahkovahti_temp_control_mode:
+    name: "Lämpötilan ohjaustila"
+    options:
+      - "Kiinteä tavoite"
+      - "Ulkolämpötila + offset"
+    initial: "Kiinteä tavoite"
+    icon: mdi:thermometer-chevron-up
+
 input_number:
   car_battery_kwh:
     name: "Auton akun kapasiteetti"
@@ -52,6 +60,87 @@ input_number:
     unit_of_measurement: "kW"
     icon: mdi:garage-variant
 
+  aisahkovahti_global_max_price:
+    name: "Hintakatto (c/kWh)"
+    min: -50.0
+    max: 200.0
+    step: 0.5
+    initial: 6.0
+    unit_of_measurement: "c/kWh"
+    icon: mdi:currency-eur
+
+  aisahkovahti_normal_temp_target:
+    name: "Normaali tavoitelämpötila (°C)"
+    min: 10.0
+    max: 26.0
+    step: 0.5
+    initial: 20.5
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer
+
+  aisahkovahti_zone_upstairs_temp:
+    name: "Yläkerran tavoitelämpötila (°C)"
+    min: 5.0
+    max: 25.0
+    step: 0.5
+    initial: 17.0
+    unit_of_measurement: "°C"
+    icon: mdi:home-floor-1
+
+  aisahkovahti_maintenance_temp:
+    name: "Loma- / mökin ylläpitolämpötila (°C)"
+    min: 5.0
+    max: 22.0
+    step: 0.5
+    initial: 10.0
+    unit_of_measurement: "°C"
+    icon: mdi:home-thermometer-outline
+
+  aisahkovahti_outdoor_offset_c:
+    name: "Lämpötilaero ulkolämpötilaan (°C)"
+    min: -10.0
+    max: 15.0
+    step: 0.5
+    initial: 2.0
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer-plus
+
+  aisahkovahti_min_allowed_temp_c:
+    name: "Minimiraja tavoitelämpötilalle (°C)"
+    min: 3.0
+    max: 22.0
+    step: 0.5
+    initial: 5.0
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer-low
+
+  aisahkovahti_max_allowed_temp_c:
+    name: "Maksimiraja tavoitelämpötilalle (°C)"
+    min: 8.0
+    max: 30.0
+    step: 0.5
+    initial: 25.0
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer-high
+
+  aisahkovahti_vacation_days:
+    name: "Loma- / ylläpitotilan kesto (vrk)"
+    min: 1
+    max: 180
+    step: 1
+    initial: 30
+    unit_of_measurement: "vrk"
+    icon: mdi:calendar-range
+
+  aisahkovahti_wh_disinfection_temp:
+    name: "Lämminvesivaraajan desinfiointiraja (°C)"
+    min: 55.0
+    max: 75.0
+    step: 1.0
+    initial: 65.0
+    unit_of_measurement: "°C"
+    icon: mdi:water-thermometer
+
 input_boolean:
   floor_fault_alert:
     name: "Hälytys: Lämmityspiirin tehopoikkeama"
@@ -60,6 +149,54 @@ input_boolean:
   profile_change_confirmed:
     name: "Profiilimuutos vahvistettu"
     icon: mdi:check-decagram
+
+  aisahkovahti_use_cheap_hours:
+    name: "Käytä halpoja tunteja / hintakattoa"
+    initial: true
+    icon: mdi:cash-check
+
+  aisahkovahti_schedule_enabled:
+    name: "Käytä omaa aikataulua"
+    initial: false
+    icon: mdi:clock-time-four-outline
+
+  aisahkovahti_manual_override:
+    name: "Pakko-ohitus päällä (auto / sauna / laite kalliilla tunnilla)"
+    icon: mdi:lightning-bolt
+
+  aisahkovahti_wh_bypass_safety:
+    name: "Lämminvesivaraaja: Ohita turvaraja (salli lämpötilan lasku)"
+    icon: mdi:shield-off-outline
+
+  aisahkovahti_vacation_mode:
+    name: "Loma- / ylläpitotila päällä (mökki tai pitkä matka)"
+    icon: mdi:beach
+
+  aisahkovahti_vacation_disable_wh:
+    name: "Lomatila: Sammuta lämminvesivaraaja kokonaan"
+    icon: mdi:water-boiler-off
+
+  aisahkovahti_wh_disinfection_needed:
+    name: "Lämminvesivaraaja: Paluudesinfiointi kesken"
+    icon: mdi:thermometer-alert
+
+input_datetime:
+  aisahkovahti_schedule_start:
+    name: "Aikataulun alkuaika"
+    has_date: false
+    has_time: true
+    initial: "22:00:00"
+
+  aisahkovahti_schedule_end:
+    name: "Aikataulun loppuaika"
+    has_date: false
+    has_time: true
+    initial: "07:00:00"
+
+  aisahkovahti_vacation_start:
+    name: "Loma- / ylläpitotilan aloitusaika"
+    has_date: true
+    has_time: true
 
 input_text:
   last_decision_reason:
@@ -125,3 +262,97 @@ automation:
         entity_id: input_select.active_car_profile
     action:
       - service: script.apply_car_profile
+
+  - id: aisahkovahti_vacation_start_stamp
+    alias: "AI-Sähkövahti: Kirjaa loma-/ylläpitotilan aloitusaika"
+    trigger:
+      - platform: state
+        entity_id: input_boolean.aisahkovahti_vacation_mode
+        to: "on"
+    action:
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.aisahkovahti_vacation_start
+        data:
+          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+      - condition: state
+        entity_id: input_boolean.aisahkovahti_vacation_disable_wh
+        state: "on"
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.aisahkovahti_wh_disinfection_needed
+
+  - id: aisahkovahti_vacation_duration_and_disinfection
+    alias: "AI-Sähkövahti: Loma-/ylläpitotilan kesto ja varaajan paluudesinfiointi"
+    trigger:
+      - platform: time_pattern
+        minutes: "/15"
+      - platform: state
+        entity_id: input_boolean.aisahkovahti_vacation_mode
+        to: "off"
+    action:
+      - choose:
+          # 1. Katkaise loma-/ylläpitotila automaattisesti, kun valittu vuorokausimäärä täyttyy
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.aisahkovahti_vacation_mode
+                state: "on"
+              - condition: template
+                value_template: >
+                  {% set start_ts = as_timestamp(states('input_datetime.aisahkovahti_vacation_start'), 0) %}
+                  {% set days = states('input_number.aisahkovahti_vacation_days') | float(30) %}
+                  {{ start_ts > 0 and ((now().timestamp() - start_ts) >= (days * 86400)) }}
+            sequence:
+              - service: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.aisahkovahti_vacation_mode
+              - service: input_text.set_value
+                target:
+                  entity_id: input_text.last_decision_reason
+                data:
+                  value: "Loma-/ylläpitotilan kesto ({{ states('input_number.aisahkovahti_vacation_days') | int }} vrk) täyttyi – palataan normaaliin."
+
+          # 2. Kun lomatila on poissa päältä ja paluudesinfiointi on tarpeen, lämmitetään halvoilla tunneilla desinfiointirajaan
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.aisahkovahti_vacation_mode
+                state: "off"
+              - condition: state
+                entity_id: input_boolean.aisahkovahti_wh_disinfection_needed
+                state: "on"
+            sequence:
+              - choose:
+                  - conditions:
+                      - condition: numeric_state
+                        entity_id: sensor.varaaja_lampotila
+                        above: input_number.aisahkovahti_wh_disinfection_temp
+                    sequence:
+                      - service: input_boolean.turn_off
+                        target:
+                          entity_id: input_boolean.aisahkovahti_wh_disinfection_needed
+                      - service: input_text.set_value
+                        target:
+                          entity_id: input_text.last_decision_reason
+                        data:
+                          value: "Lämminvesivaraajan desinfiointi valmis – palattu normaaliin automaatioon."
+                  - conditions:
+                      - condition: or
+                        conditions:
+                          - condition: state
+                            entity_id: binary_sensor.aisahkovahti_halpa_tunti
+                            state: "on"
+                          - condition: template
+                            value_template: >
+                              {{ (states('sensor.aisahkovahti_hinta_nyt') | float(999)) <= (states('input_number.aisahkovahti_global_max_price') | float(6.0)) }}
+                          - condition: state
+                            entity_id: input_boolean.aisahkovahti_manual_override
+                            state: "on"
+                    sequence:
+                      - service: water_heater.turn_on
+                        target:
+                          entity_id: water_heater.lamminvesivaraaja
+                      - service: water_heater.set_temperature
+                        target:
+                          entity_id: water_heater.lamminvesivaraaja
+                        data:
+                          temperature: "{{ states('input_number.aisahkovahti_wh_disinfection_temp') | float(65) }}"
