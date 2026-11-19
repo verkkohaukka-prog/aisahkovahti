@@ -1,6 +1,6 @@
 blueprint:
-  name: "AI-Sähkövahti: Sähköauton Älylataus (Profiili- & Ryhmäkeskustuki)"
-  description: "Käynnistää sähköauton latauksen automaattisesti AI-Sähkövahdin parhaina tunteina huomioiden aktiivisen autoprofiilin, tavoitevarauksen sekä valitun pää- tai ryhmäkeskuksen (esim. asunto tai erillinen autotalli) sulakkeiden turvatehorajan."
+  name: "AI-Sähkövahti: Sähköauton Älylataus (Profiili-, Aikataulu-, Ohitus- & Ryhmäkeskustuki)"
+  description: "Käynnistää sähköauton latauksen automaattisesti AI-Sähkövahdin parhaina tunteina, senttihintakaton alla tai käyttäjän aikataulussa. Tukee välitöntä pakko-ohitusta kalliillakin tunneilla, autoprofiileja, tavoitevarausta sekä pää- tai ryhmäkeskuksen sulakkeiden turvatehorajaa."
   domain: automation
   input:
     charger_entity:
@@ -13,6 +13,50 @@ blueprint:
       selector:
         entity:
           domain: sensor
+    spot_price_sensor:
+      name: Nykyinen sähkön hinta -sensori (snt/kWh) (valinnainen)
+      default: ""
+      selector:
+        entity:
+          domain: sensor
+    max_price_cents:
+      name: Maksimi senttihinta lataukselle (snt/kWh)
+      description: "Jos hinta alittaa tämän rajan, lataus sallitaan hintakatto- ja yhdistelmätiloissa."
+      default: 10.0
+      selector:
+        number:
+          min: -50.0
+          max: 200.0
+          step: 0.5
+          unit_of_measurement: "snt/kWh"
+    control_mode:
+      name: Ohjaustapa (halvat tunnit / aikataulu)
+      description: "Valitse ladataanko autoa vain halvoilla tunneilla/hintakatolla, vain aikataululla, molemmilla yhdessä vai ilman hinta-/aikataulurajoitusta."
+      default: "Halvat tunnit ja hintakatto"
+      selector:
+        select:
+          options:
+            - "Halvat tunnit ja hintakatto"
+            - "Vain aikataulu"
+            - "Molemmat yhdessä (aikataulu + halvat tunnit)"
+            - "Ei hinta- tai aikataulurajoitusta"
+    schedule_start:
+      name: Aikataulun alkuaika (jos aikataulu käytössä)
+      default: "22:00:00"
+      selector:
+        time: {}
+    schedule_end:
+      name: Aikataulun loppuaika (jos aikataulu käytössä)
+      default: "07:00:00"
+      selector:
+        time: {}
+    force_override_entity:
+      name: Käyttäjän pakko-ohituskytkin (valinnainen)
+      description: "Kun kytkin on ON, auto ladataan heti hinnasta ja aikataulusta riippumatta (kunhan sulakeraja ja tavoite-SoC eivät estä)."
+      default: ""
+      selector:
+        entity:
+          domain: input_boolean
     car_battery_sensor:
       name: Auton akun varaustaso % (valinnainen - pysäyttää latauksen täyttyessä)
       default: ""
@@ -77,13 +121,19 @@ mode: single
 
 trigger:
   - platform: time_pattern
-    hours: "/1"
+    minutes: "/15"
   - platform: state
     entity_id: !input best_hours_sensor
 
 variables:
   charger_ent: !input charger_entity
   best_hours_ent: !input best_hours_sensor
+  price_ent: !input spot_price_sensor
+  max_price_limit: !input max_price_cents
+  v_mode: !input control_mode
+  v_sched_start: !input schedule_start
+  v_sched_end: !input schedule_end
+  v_override_ent: !input force_override_entity
   soc_ent: !input car_battery_sensor
   fallback_max_soc: !input max_soc_limit
   target_soc_helper: !input car_target_soc_helper
@@ -94,7 +144,40 @@ variables:
   reason_helper: !input decision_reason_helper
 
   best_hours: "{{ state_attr(best_hours_ent, 'raw_hours') | default([], true) | list }}"
-  current_time: "{{ now().strftime('%H:00') }}"
+  current_hour_str: "{{ now().strftime('%H:00') }}"
+  current_time_str: "{{ now().strftime('%H:%M:%S') }}"
+  is_force_override: "{{ v_override_ent != '' and is_state(v_override_ent, 'on') }}"
+
+  is_in_schedule: >
+    {% if v_sched_start <= v_sched_end %}
+      {{ v_sched_start <= current_time_str <= v_sched_end }}
+    {% else %}
+      {{ current_time_str >= v_sched_start or current_time_str <= v_sched_end }}
+    {% endif %}
+
+  current_price_cents: >
+    {% if price_ent != '' and states(price_ent) not in ['unknown', 'unavailable', 'none'] %}
+      {% set raw_p = states(price_ent) | float(0) %}
+      {% set unit = state_attr(price_ent, 'unit_of_measurement') | default('snt/kWh', true) | lower %}
+      {{ (raw_p * 100.0) if ('eur' in unit or '€' in unit) else raw_p }}
+    {% else %}
+      0.0
+    {% endif %}
+
+  is_cheap_or_under_cap: >
+    {{ (current_hour_str in best_hours) or (price_ent != '' and current_price_cents <= (max_price_limit | float(10.0))) }}
+
+  is_mode_window_ok: >
+    {% if v_mode == 'Halvat tunnit ja hintakatto' %}
+      {{ is_cheap_or_under_cap }}
+    {% elif v_mode == 'Vain aikataulu' %}
+      {{ is_in_schedule }}
+    {% elif v_mode == 'Molemmat yhdessä (aikataulu + halvat tunnit)' %}
+      {{ is_in_schedule and is_cheap_or_under_cap }}
+    {% else %}
+      true
+    {% endif %}
+
   soc: "{{ states(soc_ent) | float(0) if soc_ent != '' else 0 }}"
   effective_max_soc: >
     {% if target_soc_helper != '' and states(target_soc_helper) not in ['unknown', 'unavailable', 'none'] %}
@@ -161,10 +244,10 @@ action:
                 data:
                   value: "EV-lataus valmis: varaustaso {{ soc }} % saavutti rajan {{ effective_max_soc }} %."
 
-      # 3. HINTA-OPTIMOINTI: Jos nyt on AI-Sähkövahdin halpa tunti, aseta profiilin virta ja käynnistä lataus
+      # 3. KÄYTTÄJÄN PAKKO-OHITUS: Lataa autoa heti kalliillakin tunnilla tai aikataulun ulkopuolella
       - conditions:
           - condition: template
-            value_template: "{{ current_time in best_hours }}"
+            value_template: "{{ is_force_override }}"
         sequence:
           - if:
               - condition: template
@@ -186,10 +269,37 @@ action:
                 target:
                   entity_id: !input decision_reason_helper
                 data:
-                  value: "EV-lataus käynnissä ({{ current_time }}): profiilin virta {{ target_current_a }} A, tavoite {{ effective_max_soc }} %."
+                  value: "EV-lataus pakotettu päälle (käyttäjän ohitus): virta {{ target_current_a }} A, tavoite {{ effective_max_soc }} %."
+
+      # 4. VALITTU OHJAUSIKKUNA (halvat tunnit / hintakatto / aikataulu / molemmat)
+      - conditions:
+          - condition: template
+            value_template: "{{ is_mode_window_ok }}"
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ charger_current_ent != '' and max_current_helper != '' }}"
+            then:
+              - service: number.set_value
+                target:
+                  entity_id: !input charger_current_entity
+                data:
+                  value: "{{ target_current_a }}"
+          - service: homeassistant.turn_on
+            target:
+              entity_id: !input charger_entity
+          - if:
+              - condition: template
+                value_template: "{{ reason_helper != '' }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input decision_reason_helper
+                data:
+                  value: "EV-lataus käynnissä ({{ v_mode }}, {{ current_hour_str }}): virta {{ target_current_a }} A, tavoite {{ effective_max_soc }} %."
 
     default:
-      # 4. Muina tunteina lataus on keskeytetty
+      # 5. Muina tunteina lataus on keskeytetty
       - service: homeassistant.turn_off
         target:
           entity_id: !input charger_entity
