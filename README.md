@@ -42,7 +42,7 @@ aisahkovahti/
 │   └── aisahkovahti_profiles.yaml
 └── README.md
 
-🚀 Asennusohjeet Home Assistantiin
+**🚀 Asennusohjeet Home Assistantiin**
 1. Pura ZIP-paketti ja kopioi tiedostot
 Lataa ZIP-paketti (tai kloonaa tämä repositorio) ja pura sen sisältö.
 
