@@ -1,13 +1,15 @@
 blueprint:
-  name: "AI-Sähkövahti: Kotiakuston & UPS-varavirran Älyohjaus (Profiilituki)"
-  description: "Lataa kotiakustoa AI-Sähkövahdin edullisina tunteina huomioiden pääsulakkeiden turvatehorajan, ja optimoi purkua hintahuippujen aikana säilyttäen aina määritellyn UPS-varavirtatason."
+  name: "AI-Sähkövahti: Kotiakuston & UPS-varavirran Älyohjaus (Profiili-, Aikataulu- & Ohitustuki)"
+  description: "Lataa kotiakustoa AI-Sähkövahdin edullisina tunteina, senttihintakaton alla tai käyttäjän aikataulussa huomioiden pääsulakkeiden turvatehorajan. Tukee välitöntä pakkolatausohitusta, ohitettavaa UPS-varavirtarajaa sekä purkua hintahuippujen aikana."
   domain: automation
   input:
     battery_mode_select:
       name: Invertterin toimintatila (Select-entiteetti tai Switch)
       selector:
         entity:
-          domain: ["select", "switch"]
+          domain:
+            - select
+            - switch
     best_hours_sensor:
       name: AI-Sähkövahti Optimaaliset Tunnit -sensori
       selector:
@@ -18,24 +20,75 @@ blueprint:
       selector:
         entity:
           domain: sensor
+    spot_price_sensor:
+      name: Nykyinen sähkön hinta -sensori (snt/kWh) (valinnainen)
+      default: ""
+      selector:
+        entity:
+          domain: sensor
+    max_charge_price_cents:
+      name: Maksimi senttihinta akun verkkolataukselle (snt/kWh)
+      description: "Jos hinta alittaa tämän rajan, verkkolataus sallitaan hintakatto- ja yhdistelmätiloissa."
+      default: 8.0
+      selector:
+        number:
+          min: -50.0
+          max: 200.0
+          step: 0.5
+          unit_of_measurement: "snt/kWh"
+    control_mode:
+      name: Verkkolatauksen ohjaustapa (halvat tunnit / aikataulu)
+      description: "Valitse ladataanko akkua verkosta halvoilla tunneilla/hintakatolla, omalla aikataululla, molemmilla yhdessä vai ilman rajoitusta."
+      default: "Halvat tunnit ja hintakatto"
+      selector:
+        select:
+          options:
+            - "Halvat tunnit ja hintakatto"
+            - "Vain aikataulu"
+            - "Molemmat yhdessä (aikataulu + halvat tunnit)"
+            - "Ei hinta- tai aikataulurajoitusta"
+    schedule_start:
+      name: Latausaikataulun alkuaika (jos aikataulu käytössä)
+      default: "00:00:00"
+      selector:
+        time: {}
+    schedule_end:
+      name: Latausaikataulun loppuaika (jos aikataulu käytössä)
+      default: "06:00:00"
+      selector:
+        time: {}
+    force_override_entity:
+      name: Käyttäjän pakkolatausohitus (valinnainen)
+      description: "Kun kytkin on ON, akku ladataan heti (esim. ennen myrskyä) hinnasta ja aikataulusta riippumatta, kunhan sulakeraja ei ylity."
+      default: ""
+      selector:
+        entity:
+          domain: input_boolean
+    bypass_ups_guard_entity:
+      name: UPS-varavirtarajan ohituskytkin (valinnainen)
+      description: "Kun kytkin on ON, akkua sallitaan purkaa hintapiikin aikana myös normaalin UPS-reservirajan alle (ehdoton alaraja 5 %)."
+      default: ""
+      selector:
+        entity:
+          domain: input_boolean
     charge_option:
       name: Invertterin lataustilan nimi (Select-entiteetille)
       description: "Invertterimerkin mukainen tila verkkolataukselle (esim. Charge, Force Charge tai Grid Charge)."
       default: "Charge"
       selector:
-        text:
+        text: {}
     discharge_option:
       name: Invertterin purku- / omakäyttötilan nimi (Select-entiteetille)
       description: "Invertterimerkin mukainen tila hintapiikin ajalle (esim. Discharge tai Max Self-Consumption)."
       default: "Discharge"
       selector:
-        text:
+        text: {}
     default_option:
       name: Invertterin normaalitilan nimi (Select-entiteetille)
       description: "Invertterin normaali perusasetus muina tunteina (esim. Auto tai Self-Use)."
       default: "Auto"
       selector:
-        text:
+        text: {}
     battery_soc_sensor:
       name: Kotiakuston varaustaso % (valinnainen - UPS-varavirtasuoja)
       description: "Mahdollistaa UPS-reservirajan (minimi-SoC) ja latauksen ylärajan valvonnan."
@@ -46,7 +99,7 @@ blueprint:
           device_class: battery
     min_backup_soc:
       name: UPS-varavirtaraja / Alin sallittu varaustaso (%)
-      description: "Estää akun purkamisen tämän rajan alle, jotta sähkökatkon varalle jää aina reserviä."
+      description: "Estää akun purkamisen tämän rajan alle (ellei UPS-ohitus ole päällä), jotta sähkökatkon varalle jää reserviä."
       default: 20
       selector:
         number:
@@ -91,7 +144,7 @@ mode: single
 
 trigger:
   - platform: time_pattern
-    hours: "/1"
+    minutes: "/15"
   - platform: state
     entity_id: !input best_hours_sensor
   - platform: state
@@ -101,6 +154,13 @@ variables:
   mode_ent: !input battery_mode_select
   best_hours_ent: !input best_hours_sensor
   spike_ent: !input spike_warning_sensor
+  price_ent: !input spot_price_sensor
+  max_price_limit: !input max_charge_price_cents
+  v_mode: !input control_mode
+  v_sched_start: !input schedule_start
+  v_sched_end: !input schedule_end
+  v_override_ent: !input force_override_entity
+  v_bypass_ups_ent: !input bypass_ups_guard_entity
   opt_charge: !input charge_option
   opt_discharge: !input discharge_option
   opt_default: !input default_option
@@ -113,8 +173,41 @@ variables:
 
   is_select_domain: "{{ mode_ent.startswith('select.') }}"
   best_hours: "{{ state_attr(best_hours_ent, 'raw_hours') | default([], true) | list }}"
-  current_time: "{{ now().strftime('%H:00') }}"
+  current_hour_str: "{{ now().strftime('%H:00') }}"
+  current_time_str: "{{ now().strftime('%H:%M:%S') }}"
   spike_active: "{{ states(spike_ent) | lower in ['true', 'on', 'high', 'varoitus', '1'] }}"
+  is_force_override: "{{ v_override_ent != '' and is_state(v_override_ent, 'on') }}"
+  is_bypass_ups: "{{ v_bypass_ups_ent != '' and is_state(v_bypass_ups_ent, 'on') }}"
+
+  is_in_schedule: >
+    {% if v_sched_start <= v_sched_end %}
+      {{ v_sched_start <= current_time_str <= v_sched_end }}
+    {% else %}
+      {{ current_time_str >= v_sched_start or current_time_str <= v_sched_end }}
+    {% endif %}
+
+  current_price_cents: >
+    {% if price_ent != '' and states(price_ent) not in ['unknown', 'unavailable', 'none'] %}
+      {% set raw_p = states(price_ent) | float(0) %}
+      {% set unit = state_attr(price_ent, 'unit_of_measurement') | default('snt/kWh', true) | lower %}
+      {{ (raw_p * 100.0) if ('eur' in unit or '€' in unit) else raw_p }}
+    {% else %}
+      0.0
+    {% endif %}
+
+  is_cheap_or_under_cap: >
+    {{ (current_hour_str in best_hours) or (price_ent != '' and current_price_cents <= (max_price_limit | float(8.0))) }}
+
+  is_charge_window_ok: >
+    {% if v_mode == 'Halvat tunnit ja hintakatto' %}
+      {{ is_cheap_or_under_cap }}
+    {% elif v_mode == 'Vain aikataulu' %}
+      {{ is_in_schedule }}
+    {% elif v_mode == 'Molemmat yhdessä (aikataulu + halvat tunnit)' %}
+      {{ is_in_schedule and is_cheap_or_under_cap }}
+    {% else %}
+      true
+    {% endif %}
 
   battery_soc: >
     {% if soc_ent != '' and states(soc_ent) not in ['unknown', 'unavailable', 'none'] %}
@@ -122,7 +215,8 @@ variables:
     {% else %}
       50.0
     {% endif %}
-  is_ups_reserve_low: "{{ soc_ent != '' and battery_soc <= (min_soc | float(20)) }}"
+  effective_min_soc: "{{ 5.0 if is_bypass_ups else (min_soc | float(20)) }}"
+  is_ups_reserve_low: "{{ soc_ent != '' and battery_soc <= effective_min_soc }}"
   is_battery_full: "{{ soc_ent != '' and battery_soc >= (max_soc | float(95)) }}"
 
   safe_limit_kw: >
@@ -146,7 +240,7 @@ action:
       # 1. SULAKESUOJA (Safety): Jos keskuksen teho ylittää turvarajan, estetään verkkolataus ja palataan normaalitilaan
       - conditions:
           - condition: template
-            value_template: "{{ current_time in best_hours and is_panel_overloaded }}"
+            value_template: "{{ (is_charge_window_ok or is_force_override) and is_panel_overloaded }}"
         sequence:
           - if:
               - condition: template
@@ -171,10 +265,10 @@ action:
                 data:
                   value: "Akuston verkkolataus estetty: keskuksen teho {{ current_panel_kw | round(1) }} kW ylittää rajan {{ safe_limit_kw }} kW."
 
-      # 2. HALVAT TUNNIT: Ladataan akkua edullisella hinnalla tavoitetasoon asti
+      # 2. KÄYTTÄJÄN PAKKOLATAUSOHITUS: Lataa akkua heti tavoitevaraukseen asti
       - conditions:
           - condition: template
-            value_template: "{{ current_time in best_hours and not is_battery_full }}"
+            value_template: "{{ is_force_override and not is_battery_full }}"
         sequence:
           - if:
               - condition: template
@@ -197,9 +291,37 @@ action:
                 target:
                   entity_id: !input decision_reason_helper
                 data:
-                  value: "Akusto lataustilassa ({{ current_time }}): varaustaso {{ battery_soc }} % / tavoite {{ max_soc }} %."
+                  value: "Akusto pakkolatauksessa (käyttäjän ohitus): varaustaso {{ battery_soc }} % / tavoite {{ max_soc }} %."
 
-      # 3. HINTAPIIKKI / KALLIS TUNTI: Puretaan akkua hintapiikin välttämiseksi (kunhan UPS-varavirtaraja ei alitu)
+      # 3. VALITTU LATAUSIKKUNA (halvat tunnit / hintakatto / aikataulu): Ladataan akkua tavoitetasoon asti
+      - conditions:
+          - condition: template
+            value_template: "{{ is_charge_window_ok and not is_battery_full }}"
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ is_select_domain }}"
+            then:
+              - service: select.select_option
+                target:
+                  entity_id: !input battery_mode_select
+                data:
+                  option: "{{ opt_charge }}"
+            else:
+              - service: homeassistant.turn_on
+                target:
+                  entity_id: !input battery_mode_select
+          - if:
+              - condition: template
+                value_template: "{{ reason_helper != '' }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input decision_reason_helper
+                data:
+                  value: "Akusto lataustilassa ({{ v_mode }}, {{ current_hour_str }}): varaustaso {{ battery_soc }} % / tavoite {{ max_soc }} %."
+
+      # 4. HINTAPIIKKI / KALLIS TUNTI: Puretaan akkua hintapiikin välttämiseksi (kunhan UPS-varavirtaraja ei alitu)
       - conditions:
           - condition: template
             value_template: "{{ spike_active and not is_ups_reserve_low }}"
@@ -225,10 +347,10 @@ action:
                 target:
                   entity_id: !input decision_reason_helper
                 data:
-                  value: "Akusto purkutilassa (hintapiikki): varaustaso {{ battery_soc }} % (UPS-raja {{ min_soc }} %)."
+                  value: "Akusto purkutilassa (hintapiikki): varaustaso {{ battery_soc }} % (raja {{ effective_min_soc }} %)."
 
     default:
-      # 4. NORMAALITILA (tai UPS-reservin suojaus): Palautetaan invertteri älykkääseen perusasetukseen
+      # 5. NORMAALITILA (tai UPS-reservin suojaus): Palautetaan invertteri älykkääseen perusasetukseen
       - if:
           - condition: template
             value_template: "{{ is_select_domain }}"
