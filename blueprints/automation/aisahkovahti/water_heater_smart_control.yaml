@@ -1,6 +1,6 @@
 blueprint:
   name: "AI-Sähkövahti: Älykäs Lämminvesivaraajan Ohjaus & Legionella-turva (Profiilituki)"
-  description: "Optimoi lämminvesivaraajan lämmityksen AI-Sähkövahdin parhaiden tuntien, senttihintakaton ja keskuksen turvatehorajan mukaan varmistaen aina ehdottoman Legionella-turvarajan."
+  description: "Optimoi lämminvesivaraajan lämmityksen AI-Sähkövahdin parhaiden tuntien, aikataulun, senttihintakaton ja keskuksen turvatehorajan mukaan. Tukee ohitettavaa Legionella-/turvarajaa, pakko-ohitusta sekä lomatilan sammutusta ja paluudesinfiointia."
   domain: automation
   input:
     water_heater_entity:
@@ -20,12 +20,12 @@ blueprint:
         entity:
           domain: sensor
     min_safe_temp:
-      name: Ehdoton minimilämpötila (Legionella-turva, °C)
-      description: "Jos vesi laskee tämän alle, lämmitys pakotetaan päälle hinnasta riippumatta."
+      name: Normaali minimilämpötila (Legionella-turva, °C)
+      description: "Jos vesi laskee tämän alle (ja turvarajan ohitus ei ole päällä), lämmitys pakotetaan päälle."
       default: 55
       selector:
         number:
-          min: 50
+          min: 35
           max: 65
           step: 1
           unit_of_measurement: "°C"
@@ -35,7 +35,7 @@ blueprint:
       default: 75
       selector:
         number:
-          min: 60
+          min: 55
           max: 85
           step: 1
           unit_of_measurement: "°C"
@@ -47,14 +47,77 @@ blueprint:
           domain: sensor
     max_price_cents:
       name: Maksimi senttihinta lämmitykselle (snt/kWh)
-      description: "Jos hinta ylittää tämän rajan, normaali lämmitys estetään (Legionella-turva silti aktiivinen)."
+      description: "Jos hinta ylittää tämän rajan, normaali lämmitys estetään (ellei halpa tunti tai ohitus ole aktiivinen)."
       default: 20.0
       selector:
         number:
-          min: 0.0
+          min: -50.0
           max: 200.0
           step: 0.5
           unit_of_measurement: "snt/kWh"
+    control_mode:
+      name: Ohjaustapa (halvat tunnit / aikataulu)
+      description: "Valitse ohjataanko varaajaa vain halvoilla tunneilla, vain aikataululla, molemmilla yhdessä vai ilman hinta-/aikataulurajoitusta."
+      default: "Halvat tunnit ja hintakatto"
+      selector:
+        select:
+          options:
+            - "Halvat tunnit ja hintakatto"
+            - "Vain aikataulu"
+            - "Molemmat yhdessä (aikataulu + halvat tunnit)"
+            - "Ei hinta- tai aikataulurajoitusta"
+    schedule_start:
+      name: Aikataulun alkuaika (jos aikataulu käytössä)
+      default: "22:00:00"
+      selector:
+        time:
+    schedule_end:
+      name: Aikataulun loppuaika (jos aikataulu käytössä)
+      default: "07:00:00"
+      selector:
+        time:
+    bypass_safety_guard_entity:
+      name: Turvarajan ohituskytkin (valinnainen)
+      description: "Kun kytkin on ON, normaali minimilämpötilan pakkolämmitys ohitetaan ja lämpötilan annetaan laskea kalliiden hintojen yli."
+      default: ""
+      selector:
+        entity:
+          domain: input_boolean
+    force_override_entity:
+      name: Käyttäjän pakko-ohituskytkin (valinnainen)
+      description: "Kun kytkin on ON, lämmitys käynnistetään heti (esim. kalliilla tunnilla), kunhan sulakeraja ei ylity."
+      default: ""
+      selector:
+        entity:
+          domain: input_boolean
+    vacation_mode_entity:
+      name: Loma- / ylläpitotilakytkin (valinnainen)
+      default: ""
+      selector:
+        entity:
+          domain: input_boolean
+    vacation_disable_wh_entity:
+      name: Lomatila: Sammuta varaaja kokonaan -kytkin (valinnainen)
+      default: ""
+      selector:
+        entity:
+          domain: input_boolean
+    disinfection_needed_entity:
+      name: Paluudesinfiointi kesken -kytkin (valinnainen)
+      default: ""
+      selector:
+        entity:
+          domain: input_boolean
+    disinfection_temp:
+      name: Paluudesinfioinnin tavoitelämpötila (°C)
+      description: "Kun lomatila päättyy, varaaja lämmitetään ensisijaisesti halvoilla tunneilla vähintään tähän lämpötilaan."
+      default: 65
+      selector:
+        number:
+          min: 55
+          max: 75
+          step: 1
+          unit_of_measurement: "°C"
     indoor_temp_sensor:
       name: Kodin sisälämpötila-anturi (valinnainen)
       default: ""
@@ -98,7 +161,7 @@ mode: single
 
 trigger:
   - platform: time_pattern
-    hours: "/1"
+    minutes: "/15"
   - platform: state
     entity_id: !input water_temp_sensor
   - platform: state
@@ -112,6 +175,15 @@ variables:
   max_temp: !input max_water_temp
   price_ent: !input spot_price_sensor
   max_price_limit: !input max_price_cents
+  v_mode: !input control_mode
+  v_sched_start: !input schedule_start
+  v_sched_end: !input schedule_end
+  v_bypass_ent: !input bypass_safety_guard_entity
+  v_override_ent: !input force_override_entity
+  v_vac_ent: !input vacation_mode_entity
+  v_vac_disable_ent: !input vacation_disable_wh_entity
+  v_disinf_ent: !input disinfection_needed_entity
+  v_disinf_temp: !input disinfection_temp
   indoor_ent: !input indoor_temp_sensor
   max_indoor: !input max_indoor_temp
   panel_power_ent: !input panel_total_power_sensor
@@ -120,13 +192,29 @@ variables:
 
   water_temp: "{{ states(water_temp_ent) | float(60) }}"
   best_hours: "{{ state_attr(best_hours_ent, 'raw_hours') | default([], true) | list }}"
-  current_time: "{{ now().strftime('%H:00') }}"
+  current_hour_str: "{{ now().strftime('%H:00') }}"
+  current_time_str: "{{ now().strftime('%H:%M:%S') }}"
+
+  is_bypass_safety: "{{ v_bypass_ent != '' and is_state(v_bypass_ent, 'on') }}"
+  is_force_override: "{{ v_override_ent != '' and is_state(v_override_ent, 'on') }}"
+  is_vacation: "{{ v_vac_ent != '' and is_state(v_vac_ent, 'on') }}"
+  is_vacation_off_wh: "{{ v_vac_disable_ent != '' and is_state(v_vac_disable_ent, 'on') }}"
+  is_disinfection_needed: "{{ v_disinf_ent != '' and is_state(v_disinf_ent, 'on') }}"
+
+  is_in_schedule: >
+    {% if v_sched_start <= v_sched_end %}
+      {{ v_sched_start <= current_time_str <= v_sched_end }}
+    {% else %}
+      {{ current_time_str >= v_sched_start or current_time_str <= v_sched_end }}
+    {% endif %}
+
   indoor_temp: >
     {% if indoor_ent != '' and states(indoor_ent) not in ['unknown', 'unavailable', 'none'] %}
       {{ states(indoor_ent) | float(20) }}
     {% else %}
       20.0
     {% endif %}
+
   current_price_cents: >
     {% if price_ent != '' and states(price_ent) not in ['unknown', 'unavailable', 'none'] %}
       {% set raw_p = states(price_ent) | float(0) %}
@@ -135,13 +223,28 @@ variables:
     {% else %}
       0.0
     {% endif %}
-  is_price_too_high: "{{ price_ent != '' and current_price_cents > (max_price_limit | float(20.0)) }}"
+
+  is_cheap_or_under_cap: >
+    {{ (current_hour_str in best_hours) or (price_ent != '' and current_price_cents <= (max_price_limit | float(20.0))) }}
+
+  is_mode_window_ok: >
+    {% if v_mode == 'Halvat tunnit ja hintakatto' %}
+      {{ is_cheap_or_under_cap }}
+    {% elif v_mode == 'Vain aikataulu' %}
+      {{ is_in_schedule }}
+    {% elif v_mode == 'Molemmat yhdessä (aikataulu + halvat tunnit)' %}
+      {{ is_in_schedule and is_cheap_or_under_cap }}
+    {% else %}
+      true
+    {% endif %}
+
   safe_limit_kw: >
     {% if panel_safe_kw_helper != '' and states(panel_safe_kw_helper) not in ['unknown', 'unavailable', 'none'] %}
       {{ states(panel_safe_kw_helper) | float(15.0) }}
     {% else %}
       15.0
     {% endif %}
+
   current_panel_kw: >
     {% if panel_power_ent != '' and states(panel_power_ent) not in ['unknown', 'unavailable', 'none'] %}
       {% set raw_val = states(panel_power_ent) | float(0) %}
@@ -150,33 +253,14 @@ variables:
     {% else %}
       0.0
     {% endif %}
+
   is_panel_overloaded: "{{ panel_power_ent != '' and current_panel_kw > safe_limit_kw }}"
+  is_over_max_temp: "{{ water_temp >= (max_temp | float(75)) }}"
+  is_indoor_too_hot: "{{ indoor_ent != '' and indoor_temp > (max_indoor | float(23.5)) }}"
 
 action:
   - choose:
-      # 1. LEGIONELLA-TURVAVAHTI: Jos vesi on alle minimirajan, pakota lämmitys päälle hinnasta riippumatta!
-      - conditions:
-          - condition: template
-            value_template: "{{ water_temp < (min_temp | float(55)) }}"
-        sequence:
-          - service: homeassistant.turn_on
-            target:
-              entity_id: !input water_heater_entity
-          - service: persistent_notification.create
-            data:
-              title: "AI-Sähkövahti: Legionella-turvavahti aktivoitunut"
-              message: "Varaajan lämpötila ({{ water_temp }} °C) alitti turvarajan ({{ min_temp }} °C). Lämmitys pakotettu päälle."
-          - if:
-              - condition: template
-                value_template: "{{ reason_helper != '' }}"
-            then:
-              - service: input_text.set_value
-                target:
-                  entity_id: !input decision_reason_helper
-                data:
-                  value: "Varaaja pakotettu päälle (Legionella-turva): {{ water_temp }} °C < {{ min_temp }} °C."
-
-      # 2. SULAKESUOJA (Safety): Jos keskuksen teho ylittää turvarajan, väistetään hetkellisesti
+      # 1. SULAKESUOJA: Jos keskuksen teho ylittää turvarajan, väistetään aina ensin
       - conditions:
           - condition: template
             value_template: "{{ is_panel_overloaded }}"
@@ -192,21 +276,12 @@ action:
                 target:
                   entity_id: !input decision_reason_helper
                 data:
-                  value: "Varaaja keskeytetty: keskuksen teho {{ current_panel_kw | round(1) }} kW ylittää rajan {{ safe_limit_kw }} kW."
+                  value: "Varaaja keskeytetty: keskuksen teho {{ current_panel_kw | round(1) }} kW > {{ safe_limit_kw }} kW."
 
-      # 3. YLÄRAJAT & HINTAKATTO: Jos vesi on jo maksimissa, koti liian lämmin tai hinta yli katon
+      # 2. KÄYTTÄJÄN PAKKO-OHITUS: Käynnistetään heti, jos ei ole yli maksimilämpötilan
       - conditions:
           - condition: template
-            value_template: "{{ water_temp >= (max_temp | float(75)) or (indoor_ent != '' and indoor_temp > (max_indoor | float(23.5))) or is_price_too_high }}"
-        sequence:
-          - service: homeassistant.turn_off
-            target:
-              entity_id: !input water_heater_entity
-
-      # 4. HINTA-OPTIMOINTI: Edullinen tunti ja varaaja kaipaa lämpöä
-      - conditions:
-          - condition: template
-            value_template: "{{ current_time in best_hours }}"
+            value_template: "{{ is_force_override and (not is_over_max_temp) }}"
         sequence:
           - service: homeassistant.turn_on
             target:
@@ -219,13 +294,125 @@ action:
                 target:
                   entity_id: !input decision_reason_helper
                 data:
-                  value: "Varaaja lämmittää ({{ current_time }}): veden lämpö {{ water_temp }} °C / tavoite {{ max_temp }} °C."
+                  value: "Varaaja pakotettu päälle (käyttäjän ohitus): {{ water_temp }} °C."
+
+      # 3. LOMATILA PÄÄLLÄ JA VARAJAJA HALUTTU POIS KÄYTÖSTÄ
+      - conditions:
+          - condition: template
+            value_template: "{{ is_vacation and is_vacation_off_wh }}"
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ v_disinf_ent != '' }}"
+            then:
+              - service: input_boolean.turn_on
+                target:
+                  entity_id: !input disinfection_needed_entity
+          - service: homeassistant.turn_off
+            target:
+              entity_id: !input water_heater_entity
+          - if:
+              - condition: template
+                value_template: "{{ reason_helper != '' }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input decision_reason_helper
+                data:
+                  value: "Lomatila aktiivinen: varaaja pois käytöstä, paluudesinfiointi merkitty."
+
+      # 4. PALUUDESINFIOINTI LOMAN JÄLKEEN: Lämmitetään halvoilla tunneilla desinfiointirajaan
+      - conditions:
+          - condition: template
+            value_template: "{{ (not is_vacation) and is_disinfection_needed }}"
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ water_temp >= (v_disinf_temp | float(65)) }}"
+                sequence:
+                  - service: input_boolean.turn_off
+                    target:
+                      entity_id: !input disinfection_needed_entity
+                  - if:
+                      - condition: template
+                        value_template: "{{ reason_helper != '' }}"
+                    then:
+                      - service: input_text.set_value
+                        target:
+                          entity_id: !input decision_reason_helper
+                        data:
+                          value: "Paluudesinfiointi valmis ({{ water_temp }} °C >= {{ v_disinf_temp }} °C) – normaali ohjaus."
+              - conditions:
+                  - condition: template
+                    value_template: "{{ is_cheap_or_under_cap }}"
+                sequence:
+                  - service: homeassistant.turn_on
+                    target:
+                      entity_id: !input water_heater_entity
+                  - if:
+                      - condition: template
+                        value_template: "{{ reason_helper != '' }}"
+                    then:
+                      - service: input_text.set_value
+                        target:
+                          entity_id: !input decision_reason_helper
+                        data:
+                          value: "Paluudesinfiointi käynnissä halpana tuntina ({{ water_temp }} °C -> {{ v_disinf_temp }} °C)."
+            default:
+              - service: homeassistant.turn_off
+                target:
+                  entity_id: !input water_heater_entity
+
+      # 5. NORMAALI TURVARAJA (OHITETTAVISSA): Pakottaa lämmityksen vain jos ohitus EI ole päällä
+      - conditions:
+          - condition: template
+            value_template: "{{ (not is_bypass_safety) and (water_temp < (min_temp | float(55))) and (not is_over_max_temp) }}"
+        sequence:
+          - service: homeassistant.turn_on
+            target:
+              entity_id: !input water_heater_entity
+          - if:
+              - condition: template
+                value_template: "{{ reason_helper != '' }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input decision_reason_helper
+                data:
+                  value: "Varaaja pakotettu päälle (turvaraja {{ min_temp }} °C): {{ water_temp }} °C."
+
+      # 6. YLÄRAJAT ESTÄVÄT LÄMMITYKSEN (kun lämpötila on ohitettu tai liian korkea)
+      - conditions:
+          - condition: template
+            value_template: "{{ is_over_max_temp or is_indoor_too_hot }}"
+        sequence:
+          - service: homeassistant.turn_off
+            target:
+              entity_id: !input water_heater_entity
+
+      # 7. VALITTU OHJAUSTAPA (halvat tunnit / aikataulu / molemmat)
+      - conditions:
+          - condition: template
+            value_template: "{{ is_mode_window_ok }}"
+        sequence:
+          - service: homeassistant.turn_on
+            target:
+              entity_id: !input water_heater_entity
+          - if:
+              - condition: template
+                value_template: "{{ reason_helper != '' }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input decision_reason_helper
+                data:
+                  value: "Varaaja lämmittää ({{ v_mode }}): {{ water_temp }} °C / tavoite {{ max_temp }} °C."
 
     default:
-      # 5. Muina tunteina pidetään pois päältä (paitsi jos ollaan vielä Legionella-lämmityksen hystereesialueella)
       - if:
           - condition: template
-            value_template: "{{ water_temp >= ((min_temp | float(55)) + 3.0) }}"
+            value_template: "{{ is_bypass_safety or water_temp >= ((min_temp | float(55)) + 3.0) }}"
         then:
           - service: homeassistant.turn_off
             target:
