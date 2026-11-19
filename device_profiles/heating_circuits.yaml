@@ -9,6 +9,23 @@ heating_circuits:
     nominal_power_w: 1000
     tolerance_pct: 10
     max_surface_temp_c: 35
+    temp_control:
+      mode: "Kiinteä tavoite"
+      base_temp_c: 23.0
+      outdoor_offset_c: 2.0
+      boost_temp_c: 2.0
+      max_temp_c: 26.0
+      min_comfort_temp_c: 20.0
+    operating_rules:
+      control_mode: "Halvat tunnit ja hintakatto"
+      max_price_cents: 15.0
+      schedule_enabled: false
+      schedule_start: "22:00:00"
+      schedule_end: "07:00:00"
+      allow_manual_override: true
+      allow_safety_bypass: false
+      vacation_mode_enabled: true
+      vacation_temp_c: 15.0
 
   - id: katto_1
     name: "Kattolämmitys – Olohuone"
@@ -18,6 +35,23 @@ heating_circuits:
     nominal_resistance_ohm: 35.3
     nominal_power_w: 1500
     tolerance_pct: 10
+    temp_control:
+      mode: "Kiinteä tavoite"
+      base_temp_c: 21.0
+      outdoor_offset_c: 2.0
+      boost_temp_c: 1.5
+      max_temp_c: 24.0
+      min_comfort_temp_c: 18.5
+    operating_rules:
+      control_mode: "Halvat tunnit ja hintakatto"
+      max_price_cents: 12.0
+      schedule_enabled: false
+      schedule_start: "22:00:00"
+      schedule_end: "07:00:00"
+      allow_manual_override: true
+      allow_safety_bypass: false
+      vacation_mode_enabled: true
+      vacation_temp_c: 10.0
 
   - id: patteriryhma_1
     name: "Sähköpatterit – Makuuhuoneet (3 kpl)"
@@ -25,3 +59,20 @@ heating_circuits:
     unit_count: 3
     unit_power_w: 800
     total_nominal_power_w: 2400
+    temp_control:
+      mode: "Kiinteä tavoite"
+      base_temp_c: 19.0
+      outdoor_offset_c: 2.0
+      boost_temp_c: 1.5
+      max_temp_c: 22.0
+      min_comfort_temp_c: 17.0
+    operating_rules:
+      control_mode: "Molemmat yhdessä (aikataulu + halvat tunnit)"
+      max_price_cents: 12.0
+      schedule_enabled: true
+      schedule_start: "21:00:00"
+      schedule_end: "07:00:00"
+      allow_manual_override: true
+      allow_safety_bypass: false
+      vacation_mode_enabled: true
+      vacation_temp_c: 10.0
