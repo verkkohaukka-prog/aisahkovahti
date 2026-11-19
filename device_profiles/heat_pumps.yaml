@@ -16,6 +16,23 @@ heat_pumps:
       - {outdoor_c: -5,  cop: 2.8}
       - {outdoor_c: 5,   cop: 4.2}
       - {outdoor_c: 15,  cop: 5.5}
+    temp_control:
+      mode: "Kiinteä tavoite"
+      base_temp_c: 21.0
+      outdoor_offset_c: 2.0
+      boost_temp_c: 2.0
+      max_temp_c: 24.0
+      min_comfort_temp_c: 19.0
+    operating_rules:
+      control_mode: "Halvat tunnit ja hintakatto"
+      max_price_cents: 15.0
+      schedule_enabled: false
+      schedule_start: "22:00:00"
+      schedule_end: "07:00:00"
+      min_outdoor_temp_for_boost_c: -15.0
+      allow_manual_override: true
+      vacation_mode_enabled: false
+      vacation_temp_c: 10.0
 
   - id: vilp_1
     name: "VILP – Päälämmitys"
@@ -33,3 +50,20 @@ heat_pumps:
       - {outdoor_c: -5,  cop: 2.5}
       - {outdoor_c: 5,   cop: 3.8}
       - {outdoor_c: 15,  cop: 4.8}
+    temp_control:
+      mode: "Kiinteä tavoite"
+      base_temp_c: 20.5
+      outdoor_offset_c: 2.0
+      boost_temp_c: 1.5
+      max_temp_c: 23.0
+      min_comfort_temp_c: 18.5
+    operating_rules:
+      control_mode: "Halvat tunnit ja hintakatto"
+      max_price_cents: 12.0
+      schedule_enabled: false
+      schedule_start: "22:00:00"
+      schedule_end: "07:00:00"
+      min_outdoor_temp_for_boost_c: -18.0
+      allow_manual_override: true
+      vacation_mode_enabled: true
+      vacation_temp_c: 10.0
