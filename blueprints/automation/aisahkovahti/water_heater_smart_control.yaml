@@ -7,7 +7,9 @@ blueprint:
       name: Lämminvesivaraaja (Climate tai Switch)
       selector:
         entity:
-          domain: ["climate", "switch"]
+          domain:
+            - climate
+            - switch
     water_temp_sensor:
       name: Varaajan lämpötila-anturi
       selector:
@@ -70,12 +72,12 @@ blueprint:
       name: Aikataulun alkuaika (jos aikataulu käytössä)
       default: "22:00:00"
       selector:
-        time:
+        time: {}
     schedule_end:
       name: Aikataulun loppuaika (jos aikataulu käytössä)
       default: "07:00:00"
       selector:
-        time:
+        time: {}
     bypass_safety_guard_entity:
       name: Turvarajan ohituskytkin (valinnainen)
       description: "Kun kytkin on ON, normaali minimilämpötilan pakkolämmitys ohitetaan ja lämpötilan annetaan laskea kalliiden hintojen yli."
@@ -189,32 +191,27 @@ variables:
   panel_power_ent: !input panel_total_power_sensor
   panel_safe_kw_helper: !input panel_max_safe_kw_helper
   reason_helper: !input decision_reason_helper
-
   water_temp: "{{ states(water_temp_ent) | float(60) }}"
   best_hours: "{{ state_attr(best_hours_ent, 'raw_hours') | default([], true) | list }}"
   current_hour_str: "{{ now().strftime('%H:00') }}"
   current_time_str: "{{ now().strftime('%H:%M:%S') }}"
-
   is_bypass_safety: "{{ v_bypass_ent != '' and is_state(v_bypass_ent, 'on') }}"
   is_force_override: "{{ v_override_ent != '' and is_state(v_override_ent, 'on') }}"
   is_vacation: "{{ v_vac_ent != '' and is_state(v_vac_ent, 'on') }}"
   is_vacation_off_wh: "{{ v_vac_disable_ent != '' and is_state(v_vac_disable_ent, 'on') }}"
   is_disinfection_needed: "{{ v_disinf_ent != '' and is_state(v_disinf_ent, 'on') }}"
-
   is_in_schedule: >
     {% if v_sched_start <= v_sched_end %}
       {{ v_sched_start <= current_time_str <= v_sched_end }}
     {% else %}
       {{ current_time_str >= v_sched_start or current_time_str <= v_sched_end }}
     {% endif %}
-
   indoor_temp: >
     {% if indoor_ent != '' and states(indoor_ent) not in ['unknown', 'unavailable', 'none'] %}
       {{ states(indoor_ent) | float(20) }}
     {% else %}
       20.0
     {% endif %}
-
   current_price_cents: >
     {% if price_ent != '' and states(price_ent) not in ['unknown', 'unavailable', 'none'] %}
       {% set raw_p = states(price_ent) | float(0) %}
@@ -223,10 +220,8 @@ variables:
     {% else %}
       0.0
     {% endif %}
-
   is_cheap_or_under_cap: >
     {{ (current_hour_str in best_hours) or (price_ent != '' and current_price_cents <= (max_price_limit | float(20.0))) }}
-
   is_mode_window_ok: >
     {% if v_mode == 'Halvat tunnit ja hintakatto' %}
       {{ is_cheap_or_under_cap }}
@@ -237,14 +232,12 @@ variables:
     {% else %}
       true
     {% endif %}
-
   safe_limit_kw: >
     {% if panel_safe_kw_helper != '' and states(panel_safe_kw_helper) not in ['unknown', 'unavailable', 'none'] %}
       {{ states(panel_safe_kw_helper) | float(15.0) }}
     {% else %}
       15.0
     {% endif %}
-
   current_panel_kw: >
     {% if panel_power_ent != '' and states(panel_power_ent) not in ['unknown', 'unavailable', 'none'] %}
       {% set raw_val = states(panel_power_ent) | float(0) %}
@@ -253,14 +246,12 @@ variables:
     {% else %}
       0.0
     {% endif %}
-
   is_panel_overloaded: "{{ panel_power_ent != '' and current_panel_kw > safe_limit_kw }}"
   is_over_max_temp: "{{ water_temp >= (max_temp | float(75)) }}"
   is_indoor_too_hot: "{{ indoor_ent != '' and indoor_temp > (max_indoor | float(23.5)) }}"
 
 action:
   - choose:
-      # 1. SULAKESUOJA: Jos keskuksen teho ylittää turvarajan, väistetään aina ensin
       - conditions:
           - condition: template
             value_template: "{{ is_panel_overloaded }}"
@@ -277,8 +268,6 @@ action:
                   entity_id: !input decision_reason_helper
                 data:
                   value: "Varaaja keskeytetty: keskuksen teho {{ current_panel_kw | round(1) }} kW > {{ safe_limit_kw }} kW."
-
-      # 2. KÄYTTÄJÄN PAKKO-OHITUS: Käynnistetään heti, jos ei ole yli maksimilämpötilan
       - conditions:
           - condition: template
             value_template: "{{ is_force_override and (not is_over_max_temp) }}"
@@ -295,8 +284,6 @@ action:
                   entity_id: !input decision_reason_helper
                 data:
                   value: "Varaaja pakotettu päälle (käyttäjän ohitus): {{ water_temp }} °C."
-
-      # 3. LOMATILA PÄÄLLÄ JA VARAJAJA HALUTTU POIS KÄYTÖSTÄ
       - conditions:
           - condition: template
             value_template: "{{ is_vacation and is_vacation_off_wh }}"
@@ -320,8 +307,6 @@ action:
                   entity_id: !input decision_reason_helper
                 data:
                   value: "Lomatila aktiivinen: varaaja pois käytöstä, paluudesinfiointi merkitty."
-
-      # 4. PALUUDESINFIOINTI LOMAN JÄLKEEN: Lämmitetään halvoilla tunneilla desinfiointirajaan
       - conditions:
           - condition: template
             value_template: "{{ (not is_vacation) and is_disinfection_needed }}"
@@ -363,8 +348,6 @@ action:
               - service: homeassistant.turn_off
                 target:
                   entity_id: !input water_heater_entity
-
-      # 5. NORMAALI TURVARAJA (OHITETTAVISSA): Pakottaa lämmityksen vain jos ohitus EI ole päällä
       - conditions:
           - condition: template
             value_template: "{{ (not is_bypass_safety) and (water_temp < (min_temp | float(55))) and (not is_over_max_temp) }}"
@@ -381,8 +364,6 @@ action:
                   entity_id: !input decision_reason_helper
                 data:
                   value: "Varaaja pakotettu päälle (turvaraja {{ min_temp }} °C): {{ water_temp }} °C."
-
-      # 6. YLÄRAJAT ESTÄVÄT LÄMMITYKSEN (kun lämpötila on ohitettu tai liian korkea)
       - conditions:
           - condition: template
             value_template: "{{ is_over_max_temp or is_indoor_too_hot }}"
@@ -390,8 +371,6 @@ action:
           - service: homeassistant.turn_off
             target:
               entity_id: !input water_heater_entity
-
-      # 7. VALITTU OHJAUSTAPA (halvat tunnit / aikataulu / molemmat)
       - conditions:
           - condition: template
             value_template: "{{ is_mode_window_ok }}"
@@ -408,7 +387,6 @@ action:
                   entity_id: !input decision_reason_helper
                 data:
                   value: "Varaaja lämmittää ({{ v_mode }}): {{ water_temp }} °C / tavoite {{ max_temp }} °C."
-
     default:
       - if:
           - condition: template
