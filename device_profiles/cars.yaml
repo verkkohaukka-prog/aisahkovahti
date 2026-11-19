@@ -15,6 +15,14 @@ cars:
     target_soc_default: 80
     buffer_kwh: 8.0
     priority: 1
+    charging_rules:
+      control_mode: "Halvat tunnit ja hintakatto"
+      max_price_cents: 10.0
+      schedule_enabled: false
+      schedule_start: "22:00:00"
+      schedule_end: "07:00:00"
+      allow_manual_override: true
+      allow_buffer_override: true
 
   - id: auto_2
     name: "Auto 2 (esim. Kakkosauto)"
@@ -31,3 +39,11 @@ cars:
     target_soc_default: 80
     buffer_kwh: 4.0
     priority: 2
+    charging_rules:
+      control_mode: "Molemmat yhdessä (aikataulu + halvat tunnit)"
+      max_price_cents: 8.0
+      schedule_enabled: true
+      schedule_start: "23:00:00"
+      schedule_end: "06:30:00"
+      allow_manual_override: true
+      allow_buffer_override: true
