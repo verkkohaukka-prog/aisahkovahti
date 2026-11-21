@@ -19,6 +19,11 @@ English overview below — *Suomenkielinen ohje löytyy alempaa.*
   - Calculates heating demand hours using 24h outdoor temperature anchor points (`-30 °C` to `+15 °C`) blended with optional local outdoor and wind-chill sensors.
   - Separates living-area sensors (e.g. `p1`, `p2`, 1st/2nd floor) from crawlspace/basement buffer zones so crawlspace frost or dry cold air never forces expensive whole-house heating.
   - Supports concrete slab sensor depth (`none`, `deep_35_50mm`, `shallow_or_near_pipe`) or smoothed return water temperature, user-adjustable target temperatures and max indoor drop limits, `cheapest_hours_only` / `max_price_cap` (c/kWh) / `combined_cheapest_and_cap` modes, and an **advisory approve-first** (`advisory_approve`) notification workflow.
+ 
+  - ### Quick 3-Step Setup for Local Price Sensors or Custom APIs (Outside `FI`)
+1. **Select Area & Currency:** Choose your bidding area (e.g. `SE1`–`SE4`, `NO1`–`NO5`, `DK1`–`DK2`, `EE`, `DE`, `AT`, `PL`, `UK`) and currency (`AUTO` or e.g. `SEK`, `NOK`, `DKK`, `PLN`, `GBP`, `EUR`).
+2. **Choose Your Price Source:** Select **Oma Home Assistant -hintasensori** (`ha_entity`) to read directly from your local Home Assistant sensor (such as Nord Pool HACS, ENTSO-E HACS, Tibber, Octopus, or Awattar), or choose **Oma API-osoite** (`custom_api`) and enter your endpoint URL (with optional `{area}` / `{currency}` placeholders) and API key.
+3. **Adjust Unit & Multiplier if Needed:** Keep `price_multiplier` at `1.0` when your source already matches the target subunit (such as `c/kWh`, `öre/kWh`, `øre/kWh`, `gr/kWh`, or `p/kWh`), or set e.g. `100.0` if your sensor reports prices in major currency units per kWh.
 
 ---
 
