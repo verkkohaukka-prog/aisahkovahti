@@ -1,6 +1,7 @@
-# AI-Sähkövahti - Thermal Mass & Anchor-Point Heating Package
+# AI-Sähkövahti - Thermal Mass, Price Cap & Anchor-Point Heating Package
 # Combines 24h weather forecast anchor points, 24h indoor moving average,
-# slab sensor depth/presence awareness, and DHW filtering.
+# slab sensor depth/presence awareness, cheap-hours / c/kWh price cap modes,
+# safety minimum temperature override, and DHW filtering.
 
 input_select:
   aisahkovahti_slab_sensor_mode:
@@ -11,6 +12,43 @@ input_select:
       - "deep_35_50mm"
       - "shallow_or_near_pipe"
     initial: "none"
+
+  aisahkovahti_heating_price_mode:
+    name: "AI-Sahkovahti Floor Heating Price Mode"
+    icon: mdi:cash-clock
+    options:
+      - "cheapest_hours_only"
+      - "max_price_cap"
+      - "combined_cheapest_and_cap"
+    initial: "combined_cheapest_and_cap"
+
+input_number:
+  aisahkovahti_slab_target_temp:
+    name: "AI-Sahkovahti Slab / Return Water Baseline Temp"
+    icon: mdi:thermometer-lines
+    min: 18.0
+    max: 32.0
+    step: 0.5
+    unit_of_measurement: "°C"
+    initial: 23.0
+
+  aisahkovahti_indoor_target_temp:
+    name: "AI-Sahkovahti Indoor Reference Temp"
+    icon: mdi:home-thermometer-outline
+    min: 18.0
+    max: 24.0
+    step: 0.5
+    unit_of_measurement: "°C"
+    initial: 21.5
+
+  aisahkovahti_max_price_cents:
+    name: "AI-Sahkovahti Max Heating Price (c/kWh)"
+    icon: mdi:currency-eur
+    min: 0.0
+    max: 50.0
+    step: 0.5
+    unit_of_measurement: "c/kWh"
+    initial: 8.0
 
 template:
   - sensor:
@@ -25,13 +63,14 @@ template:
           {# 2. Anchor points: -30°C -> 14h, +15°C -> 0h (linear interpolation) #}
           {% set base_hours = ((15 - t_out) / 45 * 14) | max(0) | min(24) %}
 
-          {# 3. 24h indoor temperature moving average correction factor (target 21.5°C, range 0.5 - 1.5) #}
-          {% set t_in_24h = states('sensor.indoor_temperature_24h_avg') | float(21.5) %}
-          {% set factor = (1 + (21.5 - t_in_24h) * 0.25) | max(0.5) | min(1.5) %}
+          {# 3. 24h indoor temperature moving average correction factor (range 0.5 - 1.5) #}
+          {% set indoor_target = states('input_number.aisahkovahti_indoor_target_temp') | float(21.5) %}
+          {% set t_in_24h = states('sensor.indoor_temperature_24h_avg') | float(indoor_target) %}
+          {% set factor = (1 + (indoor_target - t_in_24h) * 0.25) | max(0.5) | min(1.5) %}
 
           {# 4. Slab thermal charge based on whether a slab sensor exists and how deep it sits #}
           {% set mode = states('input_select.aisahkovahti_slab_sensor_mode') %}
-          {% set slab_target = 23.0 %}
+          {% set slab_target = states('input_number.aisahkovahti_slab_target_temp') | float(23.0) %}
 
           {% if mode == 'deep_35_50mm' %}
             {% set slab_temp = states('sensor.concrete_slab_temperature') | float(slab_target) %}
@@ -50,6 +89,30 @@ template:
           {{ ((base_hours * factor) - stored_offset) | round(1) | max(0) }}
 
   - binary_sensor:
+      - name: "AI-Sahkovahti Floor Heating Allowed"
+        unique_id: aisahkovahti_floor_heating_allowed
+        icon: mdi:radiator
+        state: >
+          {% set price_mode = states('input_select.aisahkovahti_heating_price_mode') %}
+          {% set price_now = states('sensor.aisahkovahti_price_now') | float(999) %}
+          {% set max_price = states('input_number.aisahkovahti_max_price_cents') | float(8.0) %}
+          {% set cheap_hour = is_state('binary_sensor.aisahkovahti_cheap_hour_active', 'on') %}
+
+          {# Safety override: allow heating if indoor temp drops more than 1.5°C below target #}
+          {% set indoor_target = states('input_number.aisahkovahti_indoor_target_temp') | float(21.5) %}
+          {% set indoor_now = states('sensor.indoor_temperature_24h_avg') | float(indoor_target) %}
+          {% set safety_needed = indoor_now < (indoor_target - 1.5) %}
+
+          {% if safety_needed %}
+            true
+          {% elif price_mode == 'cheapest_hours_only' %}
+            {{ cheap_hour }}
+          {% elif price_mode == 'max_price_cap' %}
+            {{ price_now <= max_price }}
+          {% else %}
+            {{ cheap_hour or (price_now <= max_price) }}
+          {% endif %}
+
       - name: "AI-Sahkovahti Space Heating Calibration Allowed"
         unique_id: aisahkovahti_space_heating_calibration_allowed
         icon: mdi:chart-bell-curve-cumulative
