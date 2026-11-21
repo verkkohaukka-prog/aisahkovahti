@@ -1,7 +1,7 @@
-# AI-Sähkövahti - Thermal Mass, Price Cap & Anchor-Point Heating Package
-# Combines 24h weather forecast anchor points, 24h indoor moving average,
-# slab sensor depth/presence awareness, cheap-hours / c/kWh price cap modes,
-# safety minimum temperature override, and DHW filtering.
+# AI-Sähkövahti - Thermal Mass, Zone Sensors, Price Cap & Anchor-Point Heating Package
+# Combines multi-zone indoor sensors (1st/2nd floor, p1, p2), buffer zones (crawlspace/basement),
+# local weather sensors (outdoor temp, wind speed, humidity), slab sensor depth/presence awareness,
+# cheap-hours / c/kWh price cap modes, safety overrides, and DHW filtering.
 
 input_select:
   aisahkovahti_slab_sensor_mode:
@@ -41,6 +41,15 @@ input_number:
     unit_of_measurement: "°C"
     initial: 21.5
 
+  aisahkovahti_buffer_min_temp:
+    name: "AI-Sahkovahti Crawlspace / Basement Min Temp"
+    icon: mdi:snowflake-alert
+    min: 1.0
+    max: 15.0
+    step: 0.5
+    unit_of_measurement: "°C"
+    initial: 4.0
+
   aisahkovahti_max_price_cents:
     name: "AI-Sahkovahti Max Heating Price (c/kWh)"
     icon: mdi:currency-eur
@@ -52,23 +61,107 @@ input_number:
 
 template:
   - sensor:
+      # ========================================================================
+      # 1. USER ZONE & WEATHER MAPPING (Edit sensor lists to match your entities)
+      # ========================================================================
+      - name: "AI-Sahkovahti Living Zones Avg Temp"
+        unique_id: aisahkovahti_living_zones_avg_temp
+        unit_of_measurement: "°C"
+        device_class: temperature
+        icon: mdi:home-floor-1
+        state: >
+          {# Add all living area sensors here (e.g. 1st floor, 2nd floor, p1, p2) #}
+          {% set living_sensors = [
+            'sensor.p1',
+            'sensor.p2',
+            'sensor.floor1_temperature',
+            'sensor.floor2_temperature'
+          ] %}
+          {% set indoor_target = states('input_number.aisahkovahti_indoor_target_temp') | float(21.5) %}
+          {% set valid = expand(living_sensors)
+            | map(attribute='state')
+            | reject('in', ['unknown', 'unavailable', 'none'])
+            | map('float')
+            | list %}
+          {{ (valid | sum / valid | count) | round(2) if valid | count > 0 else indoor_target }}
+
+      - name: "AI-Sahkovahti Buffer Zones Min Temp"
+        unique_id: aisahkovahti_buffer_zones_min_temp
+        unit_of_measurement: "°C"
+        device_class: temperature
+        icon: mdi:home-floor-b
+        state: >
+          {# Add crawlspace, basement, garage, or utility room sensors here #}
+          {% set buffer_sensors = [
+            'sensor.crawlspace_temperature',
+            'sensor.basement_temperature'
+          ] %}
+          {% set valid = expand(buffer_sensors)
+            | map(attribute='state')
+            | reject('in', ['unknown', 'unavailable', 'none'])
+            | map('float')
+            | list %}
+          {{ (valid | min) | round(2) if valid | count > 0 else 10.0 }}
+
+      - name: "AI-Sahkovahti Buffer Zones Max Humidity"
+        unique_id: aisahkovahti_buffer_zones_max_humidity
+        unit_of_measurement: "%"
+        device_class: humidity
+        icon: mdi:water-percent
+        state: >
+          {# Add crawlspace or basement humidity sensors here #}
+          {% set humidity_sensors = [
+            'sensor.crawlspace_humidity',
+            'sensor.basement_humidity'
+          ] %}
+          {% set valid = expand(humidity_sensors)
+            | map(attribute='state')
+            | reject('in', ['unknown', 'unavailable', 'none'])
+            | map('float')
+            | list %}
+          {{ (valid | max) | round(1) if valid | count > 0 else 55.0 }}
+
+      - name: "AI-Sahkovahti Wind Chill Heating Factor"
+        unique_id: aisahkovahti_wind_chill_heating_factor
+        icon: mdi:weather-windy
+        state: >
+          {# Optional local wind speed sensor (m/s); defaults to 1.0 if unavailable #}
+          {% set wind_ms = states('sensor.local_wind_speed') | float(0) %}
+          {% if wind_ms > 12 %}
+            1.25
+          {% elif wind_ms > 7 %}
+            1.15
+          {% elif wind_ms > 4 %}
+            1.05
+          {% else %}
+            1.0
+          {% endif %}
+
+      # ========================================================================
+      # 2. THERMAL MASS & ANCHOR-POINT HEATING DEMAND CALCULATION
+      # ========================================================================
       - name: "AI-Sahkovahti Heating Demand Hours"
         unique_id: aisahkovahti_heating_demand_hours
         unit_of_measurement: "h"
         icon: mdi:home-thermometer
         state: >
-          {# 1. Forecasted average outdoor temperature for next 24h #}
-          {% set t_out = states('sensor.aisahkovahti_forecast_temp_24h') | float(0) %}
+          {# 1. Use local outdoor temp blended with 24h forecast if available, otherwise forecast #}
+          {% set forecast_out = states('sensor.aisahkovahti_forecast_temp_24h') | float(0) %}
+          {% set local_out = states('sensor.local_outdoor_temperature') | float(forecast_out) %}
+          {% set t_out = ((forecast_out * 0.7) + (local_out * 0.3)) %}
 
           {# 2. Anchor points: -30°C -> 14h, +15°C -> 0h (linear interpolation) #}
           {% set base_hours = ((15 - t_out) / 45 * 14) | max(0) | min(24) %}
 
-          {# 3. 24h indoor temperature moving average correction factor (range 0.5 - 1.5) #}
+          {# 3. Living zones indoor temp correction factor (range 0.5 - 1.5) #}
           {% set indoor_target = states('input_number.aisahkovahti_indoor_target_temp') | float(21.5) %}
-          {% set t_in_24h = states('sensor.indoor_temperature_24h_avg') | float(indoor_target) %}
-          {% set factor = (1 + (indoor_target - t_in_24h) * 0.25) | max(0.5) | min(1.5) %}
+          {% set t_in = states('sensor.aisahkovahti_living_zones_avg_temp') | float(indoor_target) %}
+          {% set indoor_factor = (1 + (indoor_target - t_in) * 0.25) | max(0.5) | min(1.5) %}
 
-          {# 4. Slab thermal charge based on whether a slab sensor exists and how deep it sits #}
+          {# 4. Wind chill loss multiplier #}
+          {% set wind_factor = states('sensor.aisahkovahti_wind_chill_heating_factor') | float(1.0) %}
+
+          {# 5. Slab thermal charge based on whether a slab sensor exists and how deep it sits #}
           {% set mode = states('input_select.aisahkovahti_slab_sensor_mode') %}
           {% set slab_target = states('input_number.aisahkovahti_slab_target_temp') | float(23.0) %}
 
@@ -86,9 +179,12 @@ template:
 
           {% set stored_offset = ((slab_temp - slab_target) * gain) | max(-3.0) | min(4.0) %}
 
-          {{ ((base_hours * factor) - stored_offset) | round(1) | max(0) }}
+          {{ ((base_hours * indoor_factor * wind_factor) - stored_offset) | round(1) | max(0) }}
 
   - binary_sensor:
+      # ========================================================================
+      # 3. HEATING PERMISSION & CALIBRATION GATES
+      # ========================================================================
       - name: "AI-Sahkovahti Floor Heating Allowed"
         unique_id: aisahkovahti_floor_heating_allowed
         icon: mdi:radiator
@@ -98,12 +194,18 @@ template:
           {% set max_price = states('input_number.aisahkovahti_max_price_cents') | float(8.0) %}
           {% set cheap_hour = is_state('binary_sensor.aisahkovahti_cheap_hour_active', 'on') %}
 
-          {# Safety override: allow heating if indoor temp drops more than 1.5°C below target #}
+          {# Safety override 1: Living zones drop more than 1.5°C below target #}
           {% set indoor_target = states('input_number.aisahkovahti_indoor_target_temp') | float(21.5) %}
-          {% set indoor_now = states('sensor.indoor_temperature_24h_avg') | float(indoor_target) %}
-          {% set safety_needed = indoor_now < (indoor_target - 1.5) %}
+          {% set indoor_now = states('sensor.aisahkovahti_living_zones_avg_temp') | float(indoor_target) %}
+          {% set living_safety = indoor_now < (indoor_target - 1.5) %}
 
-          {% if safety_needed %}
+          {# Safety override 2: Crawlspace / basement drops below frost/moisture threshold #}
+          {% set buffer_min_target = states('input_number.aisahkovahti_buffer_min_temp') | float(4.0) %}
+          {% set buffer_temp_now = states('sensor.aisahkovahti_buffer_zones_min_temp') | float(10.0) %}
+          {% set buffer_hum_now = states('sensor.aisahkovahti_buffer_zones_max_humidity') | float(55.0) %}
+          {% set buffer_safety = (buffer_temp_now < buffer_min_target) or (buffer_hum_now > 82.0) %}
+
+          {% if living_safety or buffer_safety %}
             true
           {% elif price_mode == 'cheapest_hours_only' %}
             {{ cheap_hour }}
