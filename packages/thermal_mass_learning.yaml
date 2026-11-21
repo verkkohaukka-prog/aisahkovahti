@@ -1,7 +1,8 @@
 # AI-Sähkövahti - Thermal Mass, Zone Sensors, Price Cap & Anchor-Point Heating Package
 # Combines multi-zone indoor sensors (1st/2nd floor, p1, p2), buffer zones (crawlspace/basement),
 # local weather sensors (outdoor temp, wind speed, humidity), slab sensor depth/presence awareness,
-# cheap-hours / c/kWh price cap modes, advisory approve-first control, safety overrides, and DHW filtering.
+# cheap-hours / c/kWh price cap modes, advisory approve-first control, user-defined drop limits,
+# non-intrusive crawlspace frost notifications, and DHW filtering.
 
 input_select:
   aisahkovahti_slab_sensor_mode:
@@ -36,6 +37,11 @@ input_boolean:
     icon: mdi:check-decagram
     initial: false
 
+  aisahkovahti_buffer_notify_enabled:
+    name: "AI-Sahkovahti Crawlspace / Basement Frost Notification"
+    icon: mdi:bell-alert-outline
+    initial: true
+
 input_number:
   aisahkovahti_slab_target_temp:
     name: "AI-Sahkovahti Slab / Return Water Baseline Temp"
@@ -49,20 +55,29 @@ input_number:
   aisahkovahti_indoor_target_temp:
     name: "AI-Sahkovahti Indoor Reference Temp"
     icon: mdi:home-thermometer-outline
-    min: 18.0
+    min: 12.0
     max: 24.0
     step: 0.5
     unit_of_measurement: "°C"
     initial: 21.5
 
-  aisahkovahti_buffer_min_temp:
-    name: "AI-Sahkovahti Crawlspace / Basement Min Temp"
-    icon: mdi:snowflake-alert
-    min: 1.0
+  aisahkovahti_living_max_drop:
+    name: "AI-Sahkovahti Max Allowed Indoor Temp Drop"
+    icon: mdi:thermometer-chevron-down
+    min: 0.5
+    max: 8.0
+    step: 0.5
+    unit_of_measurement: "°C"
+    initial: 2.0
+
+  aisahkovahti_buffer_alert_temp:
+    name: "AI-Sahkovahti Crawlspace / Basement Alert Threshold"
+    icon: mdi:snowflake-thermometer
+    min: -15.0
     max: 15.0
     step: 0.5
     unit_of_measurement: "°C"
-    initial: 4.0
+    initial: -2.0
 
   aisahkovahti_max_price_cents:
     name: "AI-Sahkovahti Max Heating Price (c/kWh)"
@@ -224,24 +239,27 @@ template:
           {% set auth_mode = states('input_select.aisahkovahti_control_authorization') %}
           {% set user_approved = is_state('input_boolean.aisahkovahti_user_approved_window', 'on') %}
 
-          {# Safety override 1: Living zones drop more than 1.5°C below target #}
+          {# User-defined living area minimum drop protection (crawlspace never forces house heating) #}
           {% set indoor_target = states('input_number.aisahkovahti_indoor_target_temp') | float(21.5) %}
+          {% set max_drop = states('input_number.aisahkovahti_living_max_drop') | float(2.0) %}
           {% set indoor_now = states('sensor.aisahkovahti_living_zones_avg_temp') | float(indoor_target) %}
-          {% set living_safety = indoor_now < (indoor_target - 1.5) %}
+          {% set living_safety = indoor_now < (indoor_target - max_drop) %}
 
-          {# Safety override 2: Crawlspace / basement drops below frost/moisture threshold #}
-          {% set buffer_min_target = states('input_number.aisahkovahti_buffer_min_temp') | float(4.0) %}
-          {% set buffer_temp_now = states('sensor.aisahkovahti_buffer_zones_min_temp') | float(10.0) %}
-          {% set buffer_hum_now = states('sensor.aisahkovahti_buffer_zones_max_humidity') | float(55.0) %}
-          {% set buffer_safety = (buffer_temp_now < buffer_min_target) or (buffer_hum_now > 82.0) %}
-
-          {% if living_safety or buffer_safety %}
+          {% if living_safety %}
             true
           {% elif auth_mode == 'advisory_approve' %}
             {{ cheap_window and user_approved }}
           {% else %}
             {{ cheap_window }}
           {% endif %}
+
+      - name: "AI-Sahkovahti Buffer Zone Below Threshold"
+        unique_id: aisahkovahti_buffer_zone_below_threshold
+        icon: mdi:snowflake-alert
+        state: >
+          {% set threshold = states('input_number.aisahkovahti_buffer_alert_temp') | float(-2.0) %}
+          {% set buffer_temp = states('sensor.aisahkovahti_buffer_zones_min_temp') | float(10.0) %}
+          {{ buffer_temp <= threshold }}
 
       - name: "AI-Sahkovahti Space Heating Calibration Allowed"
         unique_id: aisahkovahti_space_heating_calibration_allowed
@@ -254,7 +272,7 @@ template:
 
 automation:
   # ============================================================================
-  # 4. ADVISORY PROPOSE -> APPROVE WORKFLOW
+  # 4. ADVISORY PROPOSE -> APPROVE & CRAWLSPACE INFO NOTIFICATIONS
   # ============================================================================
   - id: aisahkovahti_propose_preheat
     alias: "AI-Sahkovahti: Propose Heating Window (Requires User Approval)"
@@ -313,3 +331,24 @@ automation:
       - service: input_boolean.turn_off
         target:
           entity_id: input_boolean.aisahkovahti_user_approved_window
+
+  - id: aisahkovahti_notify_buffer_frost
+    alias: "AI-Sahkovahti: Crawlspace / Basement Frost Info Notification"
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.aisahkovahti_buffer_zone_below_threshold
+        to: "on"
+    condition:
+      - condition: state
+        entity_id: input_boolean.aisahkovahti_buffer_notify_enabled
+        state: "on"
+    action:
+      - service: notify.notify
+        data:
+          title: "AI-Sähkövahti: Ryömintätila / kellari pakkasella"
+          message: >
+            Lämpötila on nyt {{ states('sensor.aisahkovahti_buffer_zones_min_temp') }} °C
+            (raja {{ states('input_number.aisahkovahti_buffer_alert_temp') }} °C)
+            ja kosteus {{ states('sensor.aisahkovahti_buffer_zones_max_humidity') }} %.
+            Talon lämmitystä ei pakoteta päälle tämän vuoksi.
