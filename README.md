@@ -4,13 +4,17 @@ English overview below — *Suomenkielinen ohje löytyy alempaa.*
 
 ---
 
-## 🌍 Overview (English)
+## 🌍 Overview & Setup (English)
 
-**AI-Sähkövahti** is a Home Assistant integration and automation package built around Nord Pool spot-price markets, weather-aware price forecasting (24h, 7d, 30d), thermal mass pre-heating, and local load/fuse management.
+**AI-Sähkövahti** is a Home Assistant integration and automation package built around electricity spot-price markets, weather-aware price forecasting (24h, 7d, 30d), thermal mass pre-heating, and local load/fuse management.
 
 - **Live Dashboard & Free 24h Tier:** https://aisahkovahti.65.109.171.178.sslip.io *(Web UI currently in Finnish; English version coming soon)*
 - **Plans & Licensing:** Free 24h testing available via the site; **Pro** (7d) and **VIP** (30d) memberships are available via Gumroad (`https://hawknet.gumroad.com/`). License validation is performed via standard outbound HTTPS API requests.
 - **Local-First Security (Pull-Only):** No inbound ports or external access to your Home Assistant instance are required. The custom component only makes outbound HTTPS requests to fetch forecasts and validate license status; all heating decisions, safety limits, and relay actions run locally in Home Assistant.
+- **Multi-Area & Local Price Sources (Nordics, Baltics & Europe):**
+  - Choose your bidding area (`FI`, `SE1`–`SE4`, `NO1`–`NO5`, `DK1`–`DK2`, `EE`, `LV`, `LT`, `GER`/`DE`, `AT`, `NL`, `BE`, `FR`, `PL`, `UK`, `CH`, `CZ`, `SK`, `HU`, `RO`, `ES`, `PT`, `IT`) and currency (`AUTO` or `EUR`, `SEK`, `NOK`, `DKK`, `PLN`, `GBP`, `CHF`, `CZK`, `HUF`, `RON`).
+  - For areas outside `FI` (such as `SE1`–`SE4`, `NO1`–`NO5`, `DK1`–`DK2`, `EE`, `DE`, `AT`, `PL`, `UK`), use **Oma Home Assistant -hintasensori** (`ha_entity`) to read prices directly from your existing local Home Assistant sensor (e.g. Nord Pool HACS, ENTSO-E HACS, Tibber, Octopus, or Awattar) or specify your own API endpoint (`custom_api`) with an optional API key and price multiplier (`1.0` or e.g. `100.0` if converting major units to subunits).
+  - Using a local Home Assistant price sensor avoids centralized API rate limits and preserves your local taxes, grid tariffs, and supplier margins.
 - **Thermal Mass, Zones & Price Caps (`packages/thermal_mass_learning.yaml`):**
   - Calculates heating demand hours using 24h outdoor temperature anchor points (`-30 °C` to `+15 °C`) blended with optional local outdoor and wind-chill sensors.
   - Separates living-area sensors (e.g. `p1`, `p2`, 1st/2nd floor) from crawlspace/basement buffer zones so crawlspace frost or dry cold air never forces expensive whole-house heating.
@@ -30,6 +34,16 @@ Paketin käyttöön on saatavilla ilmainen 24h kokeilutaso sivuston kautta sekä
 
 - **Palvelinvarmennettu lisenssi:** Asennuksen yhteydessä syötetään henkilökohtainen lisenssiavain. Palvelin tarkistaa tilauksen voimassaolon ulospäin suuntautuvalla HTTPS-pyynnöllä ja määrittää tilaustason (**Pro** tai **VIP**) automaattisesti. Avoin portteja tai ulkoista pääsyä käyttäjän Home Assistantiin ei tarvita.
 - **Monitasoinen turvakerros:** Paketti sisältää sisäänrakennetun **Legionella-turvavahdin** (min. +55 °C, tarvittaessa käyttäjän ohitettavissa), pää- ja ryhmäkeskuskohtaisen **sulakesuojan**, lämpöpumppujen **COP-pakkasrajan**, lämmityspiirien **vikadiagnostiikan**, kotiakuston **UPS-varavirtasuojan**, loman jälkeisen **paluudesinfioinnin** sekä **Ehdota → Hyväksy** (`advisory_approve`) -ilmoitusmahdollisuuden.
+
+---
+
+## 🌍 Monimaatuki, Valuutat ja Oma Hintalähde (Ruotsi, Norja, Tanska, Baltia, Eurooppa)
+
+AI-Sähkövahti tukee useita Euroopan hinta-alueita (`FI`, `SE1`–`SE4`, `NO1`–`NO5`, `DK1`–`DK2`, `EE`, `LV`, `LT`, `GER`/`DE`, `AT`, `NL`, `BE`, `FR`, `PL`, `UK`, `CH`, `CZ`, `SK`, `HU`, `RO`, `ES`, `PT`, `IT`) ja valuuttoja (`AUTO` tai `EUR`, `SEK`, `NOK`, `DKK`, `PLN`, `GBP`, `CHF`, `CZK`, `HUF`, `RON`).
+
+- **Paikallinen Home Assistant -hintasensori (`ha_entity`):** Erityisesti muissa maissa (kuten Ruotsissa `SE1–SE4`, Norjassa `NO1–NO5`, Tanskassa `DK1–DK2`, Virossa/Latviassa/Liettuassa, Saksassa, Itävallassa, Puolassa tai Britanniassa) käyttäjällä on usein jo valmiina oma hintasensori (esim. Nord Pool HACS, ENTSO-E HACS, Tibber, Octopus tai Awattar). Valitsemalla `ha_entity`-tilan ja oman sensorisi integraatio lukee hinnat suoraan paikallisesti omassa Home Assistantissasi.
+- **Oma API-osoite (`custom_api`):** Vaihtoehtoisesti voit syöttää oman hintarajapinnan URL-osoitteen (tukee `{area}`- ja `{currency}`-paikkamerkkejä) sekä valinnaisen API-avaimen.
+- **Yksikkökerroin ja valuutta:** `AUTO`-valuutta valitsee maan oletusvaluutan ja alayksikön (esim. `SEK` → `öre/kWh`, `NOK`/`DKK` → `øre/kWh`, `EUR` → `c/kWh`, `PLN` → `gr/kWh`, `GBP` → `p/kWh`), ja `price_multiplier`-kertoimella (esim. `1.0` tai `100.0`) voit mukauttaa hinnan yksikön täsmälleen paikallisen sensorisi mukaan.
 
 ---
 
@@ -91,7 +105,7 @@ homeassistant:
 1. Käynnistä Home Assistant uudelleen (**Asetukset -> Järjestelmä -> Käynnistä uudelleen**).
 2. Mene kohtaan **Asetukset (Settings) -> Laitteet ja palvelut (Devices & Services)**.
 3. Klikkaa oikeasta alakulmasta **Lisää integraatio (Add Integration)** ja etsi listalta **AI-Sähkövahti**.
-4. Syötä voimassa oleva lisenssiavaimesi (tai ilmainen 24h-avain). Integraatio tunnistaa tilaustasosi automaattisesti.
+4. Syötä voimassa oleva lisenssiavaimesi (tai ilmainen 24h-avain), valitse hinta-alue (`FI`, `SE3`, `NO1` jne.) ja valuutta sekä valitse tarvittaessa oma paikallinen Home Assistant -hintasensori tai oma API-osoite. Integraatio tunnistaa tilaustasosi automaattisesti.
 
 ---
 
