@@ -1,113 +1,191 @@
 <!DOCTYPE html>
-<html lang="fi">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI-Sähkövahti — Älykäs energianohjaus kotiin</title>
+    <title>AI-Sähkövahti — Smart Energy & Thermal Mass Control for Home Assistant</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-900 text-gray-100 font-sans antialiased">
 
+    <!-- Top Language Bar -->
+    <nav class="bg-gray-950 border-b border-gray-800 px-4 py-3">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <span class="font-bold text-blue-400 tracking-wide">⚡ AI-Sähkövahti</span>
+            <div class="flex items-center gap-2">
+                <button id="btn-en" onclick="setLang('en')" class="px-3 py-1 rounded text-xs font-bold bg-blue-600 text-white transition">EN</button>
+                <button id="btn-fi" onclick="setLang('fi')" class="px-3 py-1 rounded text-xs font-bold bg-gray-800 text-gray-300 hover:bg-gray-700 transition">FI</button>
+            </div>
+        </div>
+    </nav>
+
     <!-- Hero Section -->
     <header class="bg-gradient-to-r from-blue-900 to-indigo-900 py-20 px-4 text-center">
         <div class="max-w-4xl mx-auto">
-            <span class="bg-blue-600 text-xs font-semibold uppercase px-3 py-1 rounded-full tracking-wide">Home Assistant -integraatio</span>
+            <span data-en="Home Assistant Integration & Packages" data-fi="Home Assistant -integraatio & paketit" class="lang-el bg-blue-600 text-xs font-semibold uppercase px-3 py-1 rounded-full tracking-wide">Home Assistant Integration & Packages</span>
             <h1 class="text-4xl md:text-6xl font-extrabold mt-4 mb-6 tracking-tight">AI-Sähkövahti</h1>
-            <p class="text-xl md:text-2xl text-gray-300 mb-8">Optimoi kotisi sähkönkulutus, lämminvesivaraaja, kotiakusto, sähköauton lataus ja rakenteiden lämmitys tekoälyn ennusteiden avulla.</p>
+            <p data-en="Optimize Nord Pool spot-price consumption, thermal mass pre-heating, water heaters, home batteries, and EV charging with weather-aware forecasts and 100% local control."
+               data-fi="Optimoi kotisi sähkönkulutus, rakenteiden lämpömassan esilämmitys, lämminvesivaraaja, kotiakusto ja sähköauton lataus sääennusteiden ja paikallisten turvarajojen avulla."
+               class="lang-el text-xl md:text-2xl text-gray-300 mb-8">
+               Optimize Nord Pool spot-price consumption, thermal mass pre-heating, water heaters, home batteries, and EV charging with weather-aware forecasts and 100% local control.
+            </p>
             
-            <!-- Pääpainikkeet -->
+            <!-- Primary Buttons -->
             <div class="flex flex-wrap justify-center gap-4 mb-4">
-                <a href="#hinnasto" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3 rounded-lg shadow-lg transition">Hanki jäsenyys</a>
-                <a href="https://discord.gg/SnBhsXpAW7" target="_blank" class="bg-indigo-700 hover:bg-indigo-800 text-white font-bold px-8 py-3 rounded-lg shadow-lg transition">Liity Discordiin</a>
+                <a href="#pricing" data-en="View Tiers (Free / Pro / VIP)" data-fi="Katso tasot (Ilmainen / Pro / VIP)" class="lang-el bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3 rounded-lg shadow-lg transition">View Tiers (Free / Pro / VIP)</a>
+                <a href="https://github.com/verkkohaukka-prog/aisahkovahti" target="_blank" data-en="GitHub Repository" data-fi="GitHub-repositorio" class="lang-el bg-gray-800 hover:bg-gray-700 text-white font-bold px-8 py-3 rounded-lg border border-gray-600 shadow-lg transition">GitHub Repository</a>
             </div>
 
-            <!-- Linkit PWA-sovellukseen ja blogiin -->
+            <!-- Secondary Links -->
             <div class="flex flex-wrap justify-center gap-3">
-                <a href="https://aisahkovahti.65.109.171.178.sslip.io/" target="_blank" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-2 rounded-lg shadow transition text-sm">🌐 Siirry PWA-sovellukseen</a>
-                <a href="https://aisahkovahti.blogspot.com/" target="_blank" class="bg-gray-800 hover:bg-gray-700 text-gray-200 font-semibold px-5 py-2 rounded-lg border border-gray-700 transition text-sm">📖 Lue blogi</a>
+                <a href="https://aisahkovahti.65.109.171.178.sslip.io/" target="_blank" data-en="🌐 Live Dashboard & Free 24h API" data-fi="🌐 Siirry PWA-sovellukseen (Ilmainen 24h)" class="lang-el bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-2 rounded-lg shadow transition text-sm">🌐 Live Dashboard & Free 24h API</a>
+                <a href="https://discord.gg/SnBhsXpAW7" target="_blank" data-en="💬 Join Discord" data-fi="💬 Liity Discordiin" class="lang-el bg-indigo-700 hover:bg-indigo-800 text-white font-semibold px-5 py-2 rounded-lg shadow transition text-sm">💬 Join Discord</a>
+                <a href="https://aisahkovahti.blogspot.com/" target="_blank" data-en="📖 Read Blog" data-fi="📖 Lue blogi" class="lang-el bg-gray-800 hover:bg-gray-700 text-gray-200 font-semibold px-5 py-2 rounded-lg border border-gray-700 transition text-sm">📖 Read Blog</a>
             </div>
         </div>
     </header>
 
-    <!-- Ominaisuudet -->
+    <!-- Features -->
     <section class="py-16 px-4 max-w-6xl mx-auto">
-        <h2 class="text-3xl font-bold text-center mb-12">Miksi valita AI-Sähkövahti?</h2>
+        <h2 data-en="Why AI-Sähkövahti?" data-fi="Miksi valita AI-Sähkövahti?" class="lang-el text-3xl font-bold text-center mb-12">Why AI-Sähkövahti?</h2>
         <div class="grid md:grid-cols-3 gap-8">
             <div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
                 <div class="text-blue-400 text-3xl mb-4">⚡</div>
-                <h3 class="text-xl font-semibold mb-2">Älykkäät Ennusteet</h3>
-                <p class="text-gray-400">Hyödynnä Pro (7 vrk) tai VIP (30 vrk) sähkömarkkinoiden ennusteita ja ajoita kulutus halvimmille tunneille.</p>
+                <h3 data-en="Multi-Horizon Forecasts" data-fi="Älykkäät Ennusteet" class="lang-el text-xl font-semibold mb-2">Multi-Horizon Forecasts</h3>
+                <p data-en="Combines weather forecasts and historical data for 24h (Free), 7d (Pro), and 30d (VIP) Nord Pool price trend outlooks."
+                   data-fi="Yhdistää sääennusteet ja historiadatan 24 tunnin (ilmainen), 7 vrk (Pro) ja 30 vrk (VIP) sähkömarkkinaennusteiksi."
+                   class="lang-el text-gray-400">
+                   Combines weather forecasts and historical data for 24h (Free), 7d (Pro), and 30d (VIP) Nord Pool price trend outlooks.
+                </p>
             </div>
             <div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
                 <div class="text-blue-400 text-3xl mb-4">🛡️</div>
-                <h3 class="text-xl font-semibold mb-2">Turvallisuus ensin</h3>
-                <p class="text-gray-400">Sisäänrakennettu Legionella-turva (min. +55 °C) ja älykkäät suojaukset kotisi järjestelmille.</p>
+                <h3 data-en="100% Local & Zero Open Ports" data-fi="Paikallinen & Turvallinen" class="lang-el text-xl font-semibold mb-2">100% Local & Zero Open Ports</h3>
+                <p data-en="Outbound pull-only HTTPS requests only. Includes fuse protection, Legionella guard (+55 °C), user-defined drop limits, and approve-first notifications."
+                   data-fi="Vain ulospäin suuntautuvat HTTPS-haut ilman avoimia portteja. Sisältää sulakesuojan, Legionella-turvan (+55 °C) ja Ehdota → Hyväksy -tilan."
+                   class="lang-el text-gray-400">
+                   Outbound pull-only HTTPS requests only. Includes fuse protection, Legionella guard (+55 °C), user-defined drop limits, and approve-first notifications.
+                </p>
             </div>
             <div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
-                <div class="text-blue-400 text-3xl mb-4">☀️</div>
-                <h3 class="text-xl font-semibold mb-2">Kattava automaatio</h3>
-                <p class="text-gray-400">5 valmista Blueprints-pohjaa: varaaja, auto, akku, aurinkosähkö ja rakenteiden ennakoiva esilämmitys.</p>
+                <div class="text-blue-400 text-3xl mb-4">🏗️</div>
+                <h3 data-en="Thermal Mass & Blueprints" data-fi="Lämpömassa & Blueprintit" class="lang-el text-xl font-semibold mb-2">Thermal Mass & Blueprints</h3>
+                <p data-en="Pre-heats concrete slabs and buffers using anchor-point temp scaling, multi-zone sensors, c/kWh price caps, and 5 ready-to-use Blueprints."
+                   data-fi="Varaa betonilaattaa ja varaajaa ankkuripisteiden, vyöhykeantureiden, c/kWh-hintakaton ja 5 valmiin Blueprint-pohjan avulla."
+                   class="lang-el text-gray-400">
+                   Pre-heats concrete slabs and buffers using anchor-point temp scaling, multi-zone sensors, c/kWh price caps, and 5 ready-to-use Blueprints.
+                </p>
             </div>
         </div>
     </section>
 
-    <!-- Hinnasto / Tuotteet -->
-    <section id="hinnasto" class="py-16 px-4 bg-gray-800/50">
-        <div class="max-w-5xl mx-auto text-center">
-            <h2 class="text-3xl font-bold mb-4">Valitse tarpeisiisi sopiva taso</h2>
-            <p class="text-gray-400 mb-12">Asennuspaketti sisältää kaikki tarvittavat ohjeet ja Home Assistant -komponentit.</p>
+    <!-- Pricing / Tiers -->
+    <section id="pricing" class="py-16 px-4 bg-gray-800/50">
+        <div class="max-w-6xl mx-auto text-center">
+            <h2 data-en="Choose Your Tier" data-fi="Valitse tarpeisiisi sopiva taso" class="lang-el text-3xl font-bold mb-4">Choose Your Tier</h2>
+            <p data-en="Start testing with the free 24-hour API tier or unlock 7-day and 30-day forecasts."
+               data-fi="Aloita testaaminen ilmaisella 24 tunnin tasolla tai ota käyttöön 7 vrk ja 30 vrk ennusteet."
+               class="lang-el text-gray-400 mb-12">
+               Start testing with the free 24-hour API tier or unlock 7-day and 30-day forecasts.
+            </p>
             
-            <div class="grid md:grid-cols-2 gap-8 text-left">
-                <!-- Pro-taso -->
+            <div class="grid md:grid-cols-3 gap-8 text-left">
+                <!-- Free Tier -->
                 <div class="bg-gray-800 p-8 rounded-2xl border border-gray-700 flex flex-col justify-between">
                     <div>
-                        <span class="text-blue-400 font-semibold uppercase text-sm">Suosittu</span>
-                        <h3 class="text-2xl font-bold mt-1 mb-2">AI-Sähkövahti Pro</h3>
-                        <p class="text-gray-400 mb-6">Erinomainen valinta peruskotiin.</p>
-                        <ul class="space-y-3 mb-8 text-gray-300">
-                            <li>✓ 7 vuorokauden hintiennusteet</li>
-                            <li>✓ Valmiit Home Assistant Blueprintit (5 kpl)</li>
-                            <li>✓ Lämminvesivaraaja-, EV- & lämmitysohjaus</li>
-                            <li>✓ Vapaaehtoinen Discord-yhteisö</li>
+                        <span data-en="Free Tier" data-fi="Ilmainen" class="lang-el text-emerald-400 font-semibold uppercase text-sm">Free Tier</span>
+                        <h3 class="text-2xl font-bold mt-1 mb-2">AI-Sähkövahti 24h</h3>
+                        <p data-en="Test the Home Assistant sensors and local thermal mass package at zero cost."
+                           data-fi="Kokeile Home Assistant -sensoreita ja lämpömassapakettia maksutta."
+                           class="lang-el text-gray-400 mb-6">
+                           Test the Home Assistant sensors and local thermal mass package at zero cost.
+                        </p>
+                        <ul class="space-y-3 mb-8 text-gray-300 text-sm">
+                            <li data-en="✓ 24-hour spot price & weather forecast" data-fi="✓ 24 tunnin hinta- ja sääennuste" class="lang-el">✓ 24-hour spot price & weather forecast</li>
+                            <li data-en="✓ Full thermal_mass_learning.yaml package" data-fi="✓ Täysi thermal_mass_learning.yaml -paketti" class="lang-el">✓ Full thermal_mass_learning.yaml package</li>
+                            <li data-en="✓ 100% local execution, no open ports" data-fi="✓ 100 % paikallinen suoritus, ei avoimia portteja" class="lang-el">✓ 100% local execution, no open ports</li>
                         </ul>
                     </div>
-                    <a href="https://hawknet.gumroad.com/" target="_blank" class="block text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition">Hanki Pro-taso</a>
+                    <a href="https://aisahkovahti.65.109.171.178.sslip.io/" target="_blank" data-en="Get Free 24h Access" data-fi="Aloita ilmaiseksi (24h)" class="lang-el block text-center bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg transition">Get Free 24h Access</a>
                 </div>
 
-                <!-- VIP-taso -->
-                <div class="bg-gray-800 p-8 rounded-2xl border border-blue-500 flex flex-col justify-between relative shadow-xl">
+                <!-- Pro Tier -->
+                <div class="bg-gray-800 p-8 rounded-2xl border border-gray-700 flex flex-col justify-between">
                     <div>
-                        <span class="bg-blue-500 text-white text-xs font-bold uppercase px-3 py-1 rounded-full">Laajin</span>
-                        <h3 class="text-2xl font-bold mt-1 mb-2">AI-Sähkövahti VIP</h3>
-                        <p class="text-gray-400 mb-6">Täysi paketti edistyneelle energianhallinnalle.</p>
-                        <ul class="space-y-3 mb-8 text-gray-300">
-                            <li>✓ 30 vuorokauden pitkän aikavälin ennusteet</li>
-                            <li>✓ Kaikki Pro-tason ominaisuudet</li>
-                            <li>✓ Kotiakuston ja aurinkosähkön optimointi</li>
-                            <li>✓ Ennakoiva rakenteiden esilämmitys (pakkasjaksojen varalle)</li>
-                            <li>✓ Priorisoitu tuki & Discord-yhteisö</li>
+                        <span data-en="Popular" data-fi="Suosittu" class="lang-el text-blue-400 font-semibold uppercase text-sm">Popular</span>
+                        <h3 class="text-2xl font-bold mt-1 mb-2">AI-Sähkövahti Pro</h3>
+                        <p data-en="7-day forecast horizon and full device profile automation."
+                           data-fi="7 vuorokauden ennusteet ja täydet laiteprofiilit peruskotiin."
+                           class="lang-el text-gray-400 mb-6">
+                           7-day forecast horizon and full device profile automation.
+                        </p>
+                        <ul class="space-y-3 mb-8 text-gray-300 text-sm">
+                            <li data-en="✓ 7-day electricity price forecasts" data-fi="✓ 7 vuorokauden hintaennusteet" class="lang-el">✓ 7-day electricity price forecasts</li>
+                            <li data-en="✓ Ready-made Home Assistant Blueprints (5 pcs)" data-fi="✓ Valmiit Home Assistant Blueprintit (5 kpl)" class="lang-el">✓ Ready-made Home Assistant Blueprints (5 pcs)</li>
+                            <li data-en="✓ Water heater, EV & heating circuit control" data-fi="✓ Lämminvesivaraaja-, EV- & lämmitysohjaus" class="lang-el">✓ Water heater, EV & heating circuit control</li>
+                            <li data-en="✓ Community Discord access" data-fi="✓ Vapaaehtoinen Discord-yhteisö" class="lang-el">✓ Community Discord access</li>
                         </ul>
                     </div>
-                    <a href="https://hawknet.gumroad.com/" target="_blank" class="block text-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition">Hanki VIP-taso</a>
+                    <a href="https://hawknet.gumroad.com/" target="_blank" data-en="Get Pro Tier" data-fi="Hanki Pro-taso" class="lang-el block text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition">Get Pro Tier</a>
+                </div>
+
+                <!-- VIP Tier -->
+                <div class="bg-gray-800 p-8 rounded-2xl border border-blue-500 flex flex-col justify-between relative shadow-xl">
+                    <div>
+                        <span data-en="Complete" data-fi="Laajin" class="lang-el bg-blue-500 text-white text-xs font-bold uppercase px-3 py-1 rounded-full">Complete</span>
+                        <h3 class="text-2xl font-bold mt-1 mb-2">AI-Sähkövahti VIP</h3>
+                        <p data-en="30-day long-range outlook for multi-day thermal storage & batteries."
+                           data-fi="30 vuorokauden pitkän aikavälin ennusteet edistyneelle energianhallinnalle."
+                           class="lang-el text-gray-400 mb-6">
+                           30-day long-range outlook for multi-day thermal storage & batteries.
+                        </p>
+                        <ul class="space-y-3 mb-8 text-gray-300 text-sm">
+                            <li data-en="✓ 30-day long-range price trend forecasts" data-fi="✓ 30 vuorokauden pitkän aikavälin ennusteet" class="lang-el">✓ 30-day long-range price trend forecasts</li>
+                            <li data-en="✓ All Pro tier features included" data-fi="✓ Kaikki Pro-tason ominaisuudet" class="lang-el">✓ All Pro tier features included</li>
+                            <li data-en="✓ Home battery & solar excess optimization" data-fi="✓ Kotiakuston ja aurinkosähkön optimointi" class="lang-el">✓ Home battery & solar excess optimization</li>
+                            <li data-en="✓ Multi-day cold-snap thermal pre-heating" data-fi="✓ Ennakoiva rakenteiden esilämmitys pakkasjaksoille" class="lang-el">✓ Multi-day cold-snap thermal pre-heating</li>
+                            <li data-en="✓ Priority support & Discord community" data-fi="✓ Priorisoitu tuki & Discord-yhteisö" class="lang-el">✓ Priority support & Discord community</li>
+                        </ul>
+                    </div>
+                    <a href="https://hawknet.gumroad.com/" target="_blank" data-en="Get VIP Tier" data-fi="Hanki VIP-taso" class="lang-el block text-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition">Get VIP Tier</a>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Yhteystiedot & Discord -->
+    <!-- Contact & Discord -->
     <section class="py-16 px-4 max-w-4xl mx-auto text-center">
-        <h2 class="text-2xl font-bold mb-4">Kysyttävää tai tarvitsetko apua?</h2>
-        <p class="text-gray-400 mb-6">Ota yhteyttä sähköpostitse tai liity mukaan yhteisöön!</p>
-        <div class="flex justify-center gap-6">
+        <h2 data-en="Questions or Need Help?" data-fi="Kysyttävää tai tarvitsetko apua?" class="lang-el text-2xl font-bold mb-4">Questions or Need Help?</h2>
+        <p data-en="Get in touch via email or join the community on Discord!" data-fi="Ota yhteyttä sähköpostitse tai liity mukaan yhteisöön!" class="lang-el text-gray-400 mb-6">Get in touch via email or join the community on Discord!</p>
+        <div class="flex flex-wrap justify-center gap-6">
             <a href="mailto:verkkohaukka@gmail.com" class="text-blue-400 hover:underline">verkkohaukka@gmail.com</a>
-            <a href="https://discord.gg/SnBhsXpAW7" target="_blank" class="text-indigo-400 hover:underline">Discord-yhteisö (vapaaehtoinen)</a>
+            <a href="https://discord.gg/SnBhsXpAW7" target="_blank" data-en="Discord Community (optional)" data-fi="Discord-yhteisö (vapaaehtoinen)" class="lang-el text-indigo-400 hover:underline">Discord Community (optional)</a>
         </div>
     </section>
 
     <!-- Footer -->
     <footer class="bg-gray-950 py-8 text-center text-gray-500 text-sm">
-        <p>© AI-Sähkövahti / VerkkoHaukka®. Kaikki oikeudet pidätetään.</p>
+        <p data-en="© AI-Sähkövahti / VerkkoHaukka®. All rights reserved." data-fi="© AI-Sähkövahti / VerkkoHaukka®. Kaikki oikeudet pidätetään." class="lang-el">© AI-Sähkövahti / VerkkoHaukka®. All rights reserved.</p>
     </footer>
+
+    <script>
+        function setLang(lang) {
+            document.documentElement.lang = lang;
+            document.querySelectorAll('.lang-el').forEach(el => {
+                const text = el.getAttribute('data-' + lang);
+                if (text) el.textContent = text;
+            });
+            const btnEn = document.getElementById('btn-en');
+            const btnFi = document.getElementById('btn-fi');
+            if (lang === 'en') {
+                btnEn.className = 'px-3 py-1 rounded text-xs font-bold bg-blue-600 text-white transition';
+                btnFi.className = 'px-3 py-1 rounded text-xs font-bold bg-gray-800 text-gray-300 hover:bg-gray-700 transition';
+            } else {
+                btnFi.className = 'px-3 py-1 rounded text-xs font-bold bg-blue-600 text-white transition';
+                btnEn.className = 'px-3 py-1 rounded text-xs font-bold bg-gray-800 text-gray-300 hover:bg-gray-700 transition';
+            }
+        }
+    </script>
 
 </body>
 </html>
