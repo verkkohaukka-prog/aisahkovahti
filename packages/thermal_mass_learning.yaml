@@ -1,0 +1,60 @@
+# AI-Sähkövahti - Thermal Mass & Anchor-Point Heating Package
+# Combines 24h weather forecast anchor points, 24h indoor moving average,
+# slab sensor depth/presence awareness, and DHW filtering.
+
+input_select:
+  aisahkovahti_slab_sensor_mode:
+    name: "AI-Sahkovahti Slab Sensor Depth"
+    icon: mdi:layers-triple
+    options:
+      - "none"
+      - "deep_35_50mm"
+      - "shallow_or_near_pipe"
+    initial: "none"
+
+template:
+  - sensor:
+      - name: "AI-Sahkovahti Heating Demand Hours"
+        unique_id: aisahkovahti_heating_demand_hours
+        unit_of_measurement: "h"
+        icon: mdi:home-thermometer
+        state: >
+          {# 1. Forecasted average outdoor temperature for next 24h #}
+          {% set t_out = states('sensor.aisahkovahti_forecast_temp_24h') | float(0) %}
+
+          {# 2. Anchor points: -30°C -> 14h, +15°C -> 0h (linear interpolation) #}
+          {% set base_hours = ((15 - t_out) / 45 * 14) | max(0) | min(24) %}
+
+          {# 3. 24h indoor temperature moving average correction factor (target 21.5°C, range 0.5 - 1.5) #}
+          {% set t_in_24h = states('sensor.indoor_temperature_24h_avg') | float(21.5) %}
+          {% set factor = (1 + (21.5 - t_in_24h) * 0.25) | max(0.5) | min(1.5) %}
+
+          {# 4. Slab thermal charge based on whether a slab sensor exists and how deep it sits #}
+          {% set mode = states('input_select.aisahkovahti_slab_sensor_mode') %}
+          {% set slab_target = 23.0 %}
+
+          {% if mode == 'deep_35_50mm' %}
+            {% set slab_temp = states('sensor.concrete_slab_temperature') | float(slab_target) %}
+            {% set gain = 2.0 %}
+          {% elif mode == 'shallow_or_near_pipe' %}
+            {% set slab_temp = states('sensor.concrete_slab_temperature') | float(slab_target) %}
+            {% set gain = 1.0 %}
+          {% else %}
+            {# No embedded slab sensor: fall back to smoothed return/circuit water or neutral offset #}
+            {% set slab_temp = states('sensor.heating_return_water_smoothed') | float(slab_target) %}
+            {% set gain = 0.75 %}
+          {% endif %}
+
+          {% set stored_offset = ((slab_temp - slab_target) * gain) | max(-3.0) | min(4.0) %}
+
+          {{ ((base_hours * factor) - stored_offset) | round(1) | max(0) }}
+
+  - binary_sensor:
+      - name: "AI-Sahkovahti Space Heating Calibration Allowed"
+        unique_id: aisahkovahti_space_heating_calibration_allowed
+        icon: mdi:chart-bell-curve-cumulative
+        state: >
+          {# Filter out Domestic Hot Water (DHW) cycles from space heating thermal capacity learning #}
+          {% set dhw_active = is_state('binary_sensor.heat_pump_dhw_mode', 'on') %}
+          {% set power_kw = states('sensor.heat_pump_power_kw') | float(0) %}
+          {{ not dhw_active and power_kw < 4.5 }}
