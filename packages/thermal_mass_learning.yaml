@@ -1,7 +1,7 @@
 # AI-Sähkövahti - Thermal Mass, Zone Sensors, Price Cap & Anchor-Point Heating Package
 # Combines multi-zone indoor sensors (1st/2nd floor, p1, p2), buffer zones (crawlspace/basement),
 # local weather sensors (outdoor temp, wind speed, humidity), slab sensor depth/presence awareness,
-# cheap-hours / c/kWh price cap modes, safety overrides, and DHW filtering.
+# cheap-hours / c/kWh price cap modes, advisory approve-first control, safety overrides, and DHW filtering.
 
 input_select:
   aisahkovahti_slab_sensor_mode:
@@ -21,6 +21,20 @@ input_select:
       - "max_price_cap"
       - "combined_cheapest_and_cap"
     initial: "combined_cheapest_and_cap"
+
+  aisahkovahti_control_authorization:
+    name: "AI-Sahkovahti Control Authorization Mode"
+    icon: mdi:shield-check
+    options:
+      - "advisory_approve"
+      - "auto_with_limits"
+    initial: "advisory_approve"
+
+input_boolean:
+  aisahkovahti_user_approved_window:
+    name: "AI-Sahkovahti User Approved Heating Window"
+    icon: mdi:check-decagram
+    initial: false
 
 input_number:
   aisahkovahti_slab_target_temp:
@@ -183,16 +197,32 @@ template:
 
   - binary_sensor:
       # ========================================================================
-      # 3. HEATING PERMISSION & CALIBRATION GATES
+      # 3. HEATING PERMISSION, AUTHORIZATION & CALIBRATION GATES
       # ========================================================================
-      - name: "AI-Sahkovahti Floor Heating Allowed"
-        unique_id: aisahkovahti_floor_heating_allowed
-        icon: mdi:radiator
+      - name: "AI-Sahkovahti Cheap Window Active"
+        unique_id: aisahkovahti_cheap_window_active
+        icon: mdi:clock-check-outline
         state: >
           {% set price_mode = states('input_select.aisahkovahti_heating_price_mode') %}
           {% set price_now = states('sensor.aisahkovahti_price_now') | float(999) %}
           {% set max_price = states('input_number.aisahkovahti_max_price_cents') | float(8.0) %}
           {% set cheap_hour = is_state('binary_sensor.aisahkovahti_cheap_hour_active', 'on') %}
+
+          {% if price_mode == 'cheapest_hours_only' %}
+            {{ cheap_hour }}
+          {% elif price_mode == 'max_price_cap' %}
+            {{ price_now <= max_price }}
+          {% else %}
+            {{ cheap_hour or (price_now <= max_price) }}
+          {% endif %}
+
+      - name: "AI-Sahkovahti Floor Heating Allowed"
+        unique_id: aisahkovahti_floor_heating_allowed
+        icon: mdi:radiator
+        state: >
+          {% set cheap_window = is_state('binary_sensor.aisahkovahti_cheap_window_active', 'on') %}
+          {% set auth_mode = states('input_select.aisahkovahti_control_authorization') %}
+          {% set user_approved = is_state('input_boolean.aisahkovahti_user_approved_window', 'on') %}
 
           {# Safety override 1: Living zones drop more than 1.5°C below target #}
           {% set indoor_target = states('input_number.aisahkovahti_indoor_target_temp') | float(21.5) %}
@@ -207,12 +237,10 @@ template:
 
           {% if living_safety or buffer_safety %}
             true
-          {% elif price_mode == 'cheapest_hours_only' %}
-            {{ cheap_hour }}
-          {% elif price_mode == 'max_price_cap' %}
-            {{ price_now <= max_price }}
+          {% elif auth_mode == 'advisory_approve' %}
+            {{ cheap_window and user_approved }}
           {% else %}
-            {{ cheap_hour or (price_now <= max_price) }}
+            {{ cheap_window }}
           {% endif %}
 
       - name: "AI-Sahkovahti Space Heating Calibration Allowed"
@@ -223,3 +251,65 @@ template:
           {% set dhw_active = is_state('binary_sensor.heat_pump_dhw_mode', 'on') %}
           {% set power_kw = states('sensor.heat_pump_power_kw') | float(0) %}
           {{ not dhw_active and power_kw < 4.5 }}
+
+automation:
+  # ============================================================================
+  # 4. ADVISORY PROPOSE -> APPROVE WORKFLOW
+  # ============================================================================
+  - id: aisahkovahti_propose_preheat
+    alias: "AI-Sahkovahti: Propose Heating Window (Requires User Approval)"
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.aisahkovahti_cheap_window_active
+        to: "on"
+    condition:
+      - condition: state
+        entity_id: input_select.aisahkovahti_control_authorization
+        state: "advisory_approve"
+      - condition: numeric_state
+        entity_id: sensor.aisahkovahti_heating_demand_hours
+        above: 0
+    action:
+      - service: notify.notify
+        data:
+          title: "AI-Sähkövahti: Lämmityssuositus"
+          message: >
+            Edullinen jakso alkanut ({{ states('sensor.aisahkovahti_price_now') }} c/kWh).
+            Laskettu tarve: {{ states('sensor.aisahkovahti_heating_demand_hours') }} h.
+            Hyväksytkö lattialämmityksen / varauksen?
+          data:
+            actions:
+              - action: "AISAHKOVAHTI_APPROVE_HEAT"
+                title: "Hyväksy lämmitys"
+              - action: "AISAHKOVAHTI_REJECT_HEAT"
+                title: "Ohita"
+
+  - id: aisahkovahti_handle_approval
+    alias: "AI-Sahkovahti: Handle User Approval Response"
+    mode: single
+    trigger:
+      - platform: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: "AISAHKOVAHTI_APPROVE_HEAT"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.aisahkovahti_user_approved_window
+
+  - id: aisahkovahti_handle_rejection_or_window_end
+    alias: "AI-Sahkovahti: Reset Approval on Reject or Window End"
+    mode: single
+    trigger:
+      - platform: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: "AISAHKOVAHTI_REJECT_HEAT"
+      - platform: state
+        entity_id: binary_sensor.aisahkovahti_cheap_window_active
+        to: "off"
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.aisahkovahti_user_approved_window
