@@ -1,0 +1,292 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "AI-Sähkövahti — Licence & Zone tarifaire",
+        "description": "Saisissez votre clé de licence personnelle (Pro / VIP) ou votre clé d'essai gratuite de 24h. Ensuite, l'assistant guidé Oui/Non vous aide à configurer vos capteurs de température, chauffe-eau, chauffage au sol, véhicules électriques et pompes à chaleur sans coder en YAML.",
+        "data": {
+          "license_key": "Clé de licence",
+          "area": "Zone tarifaire (ex. FR, FI, SE3, DE)",
+          "currency_choice": "Devise",
+          "price_source_mode": "Source des prix",
+          "source_entity_id": "Capteur de prix Home Assistant (ex. Nord Pool / ENTSO-E)",
+          "price_attribute": "Attribut de prix (par défaut : auto)",
+          "price_multiplier": "Multiplicateur d'unité (par défaut : 1.0)",
+          "custom_price_url": "URL API personnalisée (facultatif)",
+          "custom_api_key": "Clé API personnalisée (facultatif)"
+        }
+      },
+      "wiz_sensors_yn": {
+        "title": "Étape 1/5 — Contrat d'électricité & Capteurs de température",
+        "description": "Sélectionnez votre type de contrat (heures pleines / heures creuses également pris en charge) et répondez Oui/Non si vous avez des capteurs de température à l'étage, au rez-de-chaussée ou à l'extérieur. Vous pouvez aussi répondre Non à tout.",
+        "data": {
+          "tariff_type": "Type de contrat d'électricité",
+          "has_upstairs_sensor": "Avez-vous un capteur de température à l'étage ?",
+          "has_downstairs_sensor": "Avez-vous un capteur de température au rez-de-chaussée ?",
+          "has_outdoor_sensor": "Avez-vous un capteur de température extérieur ?"
+        }
+      },
+      "wiz_sensors_details": {
+        "title": "Étape 1/5 — Sélectionner les capteurs ou saisir le nom WiFi",
+        "description": "Sélectionnez un ou plusieurs capteurs Home Assistant dans la liste ET/OU saisissez le nom du capteur WiFi (ex. Shelly H&T Étage).",
+        "data": {
+          "upstairs_entities": "Capteurs à l'étage (plusieurs possibles)",
+          "upstairs_wifi_names": "Nom du capteur WiFi à l'étage (facultatif)",
+          "downstairs_entities": "Capteurs au rez-de-chaussée (plusieurs possibles)",
+          "downstairs_wifi_names": "Nom du capteur WiFi au rez-de-chaussée (facultatif)",
+          "outdoor_entities": "Capteurs de température extérieurs",
+          "outdoor_wifi_names": "Nom du capteur WiFi extérieur (facultatif)"
+        }
+      },
+      "wiz_water_yn": {
+        "title": "Étape 2/5 — Chauffe-eau électrique (Cumulus)",
+        "description": "Avez-vous un chauffe-eau électrique ? Remarque : Home Assistant ne peut pas couper le courant 230/400 V sans relais intelligent ou contacteur — sans connexion WiFi, AI-Sähkövahti réserve tout de même sa puissance pour protéger le disjoncteur principal.",
+        "data": {
+          "has_water_heater": "Avez-vous un chauffe-eau électrique ?"
+        }
+      },
+      "wiz_water_details": {
+        "title": "Étape 2/5 — Détails du chauffe-eau",
+        "description": "Saisissez le nom et la puissance (kW) du chauffe-eau. Si le chauffe-eau ou son contacteur jour/nuit n'a pas encore de relais WiFi (ex. Shelly Pro 1PM), sélectionnez « Non ».",
+        "data": {
+          "name": "Nom du chauffe-eau",
+          "has_wifi_or_ha": "Le chauffe-eau ou son contacteur est-il connecté au WiFi / HA ?",
+          "power_kw": "Puissance du chauffe-eau (kW)",
+          "panel_group": "Groupe de fusibles / Tableau électrique",
+          "cheapest_hours_needed": "Heures les moins chères nécessaires par jour (h)",
+          "control_entity_id": "Entité de contrôle HA (si Oui)",
+          "wifi_device_note": "Note sur le relais WiFi ou contacteur (facultatif)"
+        }
+      },
+      "wiz_floor_yn": {
+        "title": "Étape 3/5 — Chauffage au sol électrique",
+        "description": "Avez-vous un chauffage au sol électrique ? Si Oui, vous pouvez configurer une ou plusieurs pièces ainsi que les sondes de dalle béton et de surface.",
+        "data": {
+          "has_floor_heating": "Avez-vous un chauffage au sol électrique ?",
+          "floor_scope": "Dans une seule pièce ou plusieurs pièces ?"
+        }
+      },
+      "wiz_floor_room": {
+        "title": "Étape 3/5 — Détails de la pièce chauffée au sol",
+        "description": "Une sonde dans la dalle béton permet d'accumuler la chaleur pendant les heures creuses ; une sonde de surface utilise des cycles courts et réguliers.",
+        "data": {
+          "room_name": "Nom de la pièce ou de la zone (ex. Salle de bain, Salon)",
+          "power_kw": "Puissance du chauffage au sol (kW)",
+          "has_wifi_or_ha": "Le thermostat/relais est-il connecté au WiFi / HA ?",
+          "has_concrete_sensor": "Y a-t-il une sonde dans la dalle béton ?",
+          "slab_sensor_depth": "Profondeur de la sonde béton (si Oui)",
+          "has_surface_sensor": "Y a-t-il une sonde de température de surface / ambiante ?",
+          "floor_temp_entity_id": "Capteur de température sol / pièce (facultatif)",
+          "control_entity_id": "Entité de contrôle HA (facultatif)",
+          "panel_group": "Groupe de fusibles / Tableau électrique",
+          "add_another_room": "Ajouter une autre pièce avec chauffage au sol ?"
+        }
+      },
+      "wiz_ev_yn": {
+        "title": "Étape 4/5 — Véhicule électrique ou Borne de recharge",
+        "description": "Avez-vous un véhicule électrique ou une borne de recharge ? Vous pouvez ajouter un ou plusieurs véhicules et en changer ultérieurement en un clic.",
+        "data": {
+          "has_ev": "Avez-vous un véhicule électrique ou une borne de recharge ?"
+        }
+      },
+      "wiz_ev_details": {
+        "title": "Étape 4/5 — Détails du véhicule électrique / Borne",
+        "description": "Connectez une entité HA (ex. Tesla, Easee, Zaptec) ou ajoutez le véhicule comme charge manuelle sans connexion réseau.",
+        "data": {
+          "name": "Nom du véhicule ou de la borne",
+          "has_wifi_or_ha": "Le véhicule ou la borne est-il connecté au WiFi / HA ?",
+          "power_kw": "Puissance de charge (kW)",
+          "panel_group": "Groupe de fusibles / Tableau électrique",
+          "cheapest_hours_needed": "Heures de charge nécessaires par jour (h)",
+          "control_entity_id": "Entité de contrôle HA (facultatif)",
+          "wifi_device_note": "Note supplémentaire (facultatif)",
+          "add_another_ev": "Ajouter un deuxième véhicule électrique ?"
+        }
+      },
+      "wiz_other_yn": {
+        "title": "Étape 5/5 — Pompes à chaleur, Radiateurs électriques & Sauna",
+        "description": "Souhaitez-vous ajouter une pompe à chaleur, des radiateurs électriques ou un sauna ?",
+        "data": {
+          "has_other_device": "Ajouter une pompe à chaleur, des radiateurs ou un sauna ?"
+        }
+      },
+      "wiz_other_details": {
+        "title": "Étape 5/5 — Ajouter un appareil de chauffage ou une charge",
+        "description": "Vous pouvez ajouter plusieurs appareils à la suite en sélectionnant « Oui » en bas.",
+        "data": {
+          "category": "Type d'appareil",
+          "name": "Nom de l'appareil ou de la pièce",
+          "has_wifi_or_ha": "L'appareil est-il connecté au WiFi / HA ?",
+          "power_kw": "Puissance (kW)",
+          "panel_group": "Groupe de fusibles / Tableau électrique",
+          "cheapest_hours_needed": "Heures les moins chères nécessaires par jour (h)",
+          "control_entity_id": "Entité de contrôle HA (facultatif)",
+          "wifi_device_note": "Note supplémentaire (facultatif)",
+          "add_more_other": "Ajouter un autre appareil ou une autre pièce ?"
+        }
+      }
+    },
+    "error": {
+      "invalid_license_key": "La clé de licence est invalide ou la vérification a échoué.",
+      "non_fi_requires_local_source": "Hors de FI, veuillez sélectionner un capteur de prix HA local ou une URL API personnalisée.",
+      "missing_source_entity": "Veuillez sélectionner un capteur de prix Home Assistant.",
+      "missing_custom_url": "Veuillez saisir l'URL de votre API personnalisée."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "AI-Sähkövahti — Menu de contrôle Plug & Play",
+        "description": "Choisissez une action. Appareils enregistrés : {device_count}. Lancez l'assistant guidé Oui/Non, ajoutez un appareil ou remplacez un véhicule sans éditer de fichiers YAML.",
+        "data": {
+          "menu_action": "Que souhaitez-vous faire ?"
+        }
+      },
+      "wiz_sensors_yn": {
+        "title": "Étape 1/5 — Contrat d'électricité & Capteurs",
+        "description": "Sélectionnez votre contrat (heures creuses incluses) et répondez Oui/Non pour les capteurs de température.",
+        "data": {
+          "tariff_type": "Type de contrat d'électricité",
+          "has_upstairs_sensor": "Capteur de température à l'étage ?",
+          "has_downstairs_sensor": "Capteur de température au rez-de-chaussée ?",
+          "has_outdoor_sensor": "Capteur de température extérieur ?"
+        }
+      },
+      "wiz_sensors_details": {
+        "title": "Étape 1/5 — Sélectionner les capteurs",
+        "description": "Sélectionnez un ou plusieurs capteurs ou saisissez le nom du capteur WiFi.",
+        "data": {
+          "upstairs_entities": "Capteurs à l'étage",
+          "upstairs_wifi_names": "Nom du capteur WiFi à l'étage",
+          "downstairs_entities": "Capteurs au rez-de-chaussée",
+          "downstairs_wifi_names": "Nom du capteur WiFi au rez-de-chaussée",
+          "outdoor_entities": "Capteurs extérieurs",
+          "outdoor_wifi_names": "Nom du capteur WiFi extérieur"
+        }
+      },
+      "wiz_water_yn": {
+        "title": "Étape 2/5 — Chauffe-eau électrique",
+        "description": "Avez-vous un chauffe-eau électrique ?",
+        "data": {
+          "has_water_heater": "Avez-vous un chauffe-eau électrique ?"
+        }
+      },
+      "wiz_water_details": {
+        "title": "Étape 2/5 — Détails du chauffe-eau",
+        "description": "Saisissez la puissance (kW) et si le chauffe-eau ou son contacteur est connecté au WiFi.",
+        "data": {
+          "name": "Nom du chauffe-eau",
+          "has_wifi_or_ha": "Connecté au WiFi / HA ?",
+          "power_kw": "Puissance (kW)",
+          "panel_group": "Groupe de fusibles",
+          "cheapest_hours_needed": "Heures nécessaires (h)",
+          "control_entity_id": "Entité de contrôle HA",
+          "wifi_device_note": "Note supplémentaire"
+        }
+      },
+      "wiz_floor_yn": {
+        "title": "Étape 3/5 — Chauffage au sol électrique",
+        "description": "Avez-vous un chauffage au sol électrique ?",
+        "data": {
+          "has_floor_heating": "Avez-vous un chauffage au sol électrique ?",
+          "floor_scope": "Une pièce ou plusieurs pièces ?"
+        }
+      },
+      "wiz_floor_room": {
+        "title": "Étape 3/5 — Détails de la pièce",
+        "description": "Saisissez le nom de la pièce, la puissance et les sondes de dalle/surface.",
+        "data": {
+          "room_name": "Nom de la pièce",
+          "power_kw": "Puissance (kW)",
+          "has_wifi_or_ha": "Connecté au WiFi / HA ?",
+          "has_concrete_sensor": "Sonde dans la dalle béton ?",
+          "slab_sensor_depth": "Profondeur de la sonde",
+          "has_surface_sensor": "Sonde de surface ?",
+          "floor_temp_entity_id": "Capteur de température",
+          "control_entity_id": "Entité de contrôle HA",
+          "panel_group": "Groupe de fusibles",
+          "add_another_room": "Ajouter la pièce suivante ?"
+        }
+      },
+      "wiz_ev_yn": {
+        "title": "Étape 4/5 — Véhicule électrique ou Borne",
+        "description": "Avez-vous un véhicule électrique ou une borne ?",
+        "data": {
+          "has_ev": "Avez-vous un véhicule électrique ou une borne ?"
+        }
+      },
+      "wiz_ev_details": {
+        "title": "Étape 4/5 — Détails du véhicule électrique",
+        "description": "Vous pouvez ajouter plusieurs véhicules à la suite.",
+        "data": {
+          "name": "Nom du véhicule",
+          "has_wifi_or_ha": "Connecté au WiFi / HA ?",
+          "power_kw": "Puissance de charge (kW)",
+          "panel_group": "Groupe de fusibles",
+          "cheapest_hours_needed": "Heures nécessaires (h)",
+          "control_entity_id": "Entité de contrôle HA",
+          "wifi_device_note": "Note supplémentaire",
+          "add_another_ev": "Ajouter un deuxième véhicule électrique ?"
+        }
+      },
+      "wiz_other_yn": {
+        "title": "Étape 5/5 — Autres appareils (Pompes à chaleur, Radiateurs, Sauna)",
+        "description": "Ajouter une pompe à chaleur, des radiateurs ou un sauna ?",
+        "data": {
+          "has_other_device": "Ajouter un autre appareil ?"
+        }
+      },
+      "wiz_other_details": {
+        "title": "Étape 5/5 — Détails de l'appareil",
+        "description": "Vous pouvez ajouter plusieurs appareils à la suite.",
+        "data": {
+          "category": "Type d'appareil",
+          "name": "Nom",
+          "has_wifi_or_ha": "Connecté au WiFi / HA ?",
+          "power_kw": "Puissance (kW)",
+          "panel_group": "Groupe de fusibles",
+          "cheapest_hours_needed": "Heures nécessaires (h)",
+          "control_entity_id": "Entité de contrôle HA",
+          "wifi_device_note": "Note supplémentaire",
+          "add_more_other": "Ajouter un autre appareil ?"
+        }
+      },
+      "add_device": {
+        "title": "Ajouter un appareil ou une pièce",
+        "description": "Fonctionne aussi entièrement hors ligne — saisissez simplement le nom, la catégorie et la puissance (kW).",
+        "data": {
+          "name": "Nom de l'appareil ou de la pièce",
+          "category": "Type d'appareil",
+          "has_wifi_or_ha": "Connecté au WiFi / HA ?",
+          "power_kw": "Puissance (kW)",
+          "panel_group": "Groupe de fusibles",
+          "cheapest_hours_needed": "Heures les moins chères nécessaires (h)",
+          "control_entity_id": "Entité de contrôle HA (facultatif)",
+          "wifi_device_note": "Note supplémentaire (facultatif)"
+        }
+      },
+      "manage_devices": {
+        "title": "Gérer ou supprimer des appareils",
+        "description": "Sélectionnez les appareils à supprimer (ex. ancien véhicule lors d'un remplacement).",
+        "data": {
+          "remove_ids": "Appareils à supprimer"
+        }
+      },
+      "general_settings": {
+        "title": "Paramètres généraux",
+        "description": "Modifier la clé de licence, la zone tarifaire, la devise ou la source des prix.",
+        "data": {
+          "license_key": "Clé de licence",
+          "area": "Zone tarifaire",
+          "currency_choice": "Devise",
+          "price_source_mode": "Source des prix",
+          "source_entity_id": "Capteur de prix HA",
+          "price_attribute": "Attribut de prix",
+          "price_multiplier": "Multiplicateur d'unité",
+          "custom_price_url": "URL API personnalisée",
+          "custom_api_key": "Clé API personnalisée"
+        }
+      }
+    }
+  }
+}
