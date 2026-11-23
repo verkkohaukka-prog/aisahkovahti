@@ -1,0 +1,292 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "AI-Sähkövahti — Lisenssi & Hinta-alue",
+        "description": "Syötä henkilökohtainen lisenssiavaimesi (Pro / VIP) tai ilmainen 24h-kokeiluavain. Seuraavaksi opastettu Kyllä/Ei-velho auttaa lisäämään anturit, varaajan, lattialämmityksen, sähköautot ja lämpöpumput ilman YAML-koodausta.",
+        "data": {
+          "license_key": "Lisenssiavain",
+          "area": "Hinta-alue (esim. FI, SE3, NO1)",
+          "currency_choice": "Valuutta",
+          "price_source_mode": "Hintalähde",
+          "source_entity_id": "Oma Home Assistant -hintasensori (valinnainen FI:ssä)",
+          "price_attribute": "Hinta-attribuutti (oletus: auto)",
+          "price_multiplier": "Yksikkökerroin (oletus: 1.0)",
+          "custom_price_url": "Oma API-osoite (valinnainen)",
+          "custom_api_key": "Oman API:n avain (valinnainen)"
+        }
+      },
+      "wiz_sensors_yn": {
+        "title": "Vaihe 1/5 — Sähkösopimus & Lämpötila-anturit",
+        "description": "Valitse sähkösopimuksesi tyyppi (myös yösähkö/kausisähkö tuettu) ja kerro Kyllä/Ei, onko kohteessa lämpötila-antureita yläkerrassa, alakerrassa tai ulkona. Kaikkiin voi vastata myös Ei.",
+        "data": {
+          "tariff_type": "Sähkösopimuksen tyyppi",
+          "has_upstairs_sensor": "Onko yläkerrassa lämpötila-anturia?",
+          "has_downstairs_sensor": "Onko alakerrassa lämpötila-anturia?",
+          "has_outdoor_sensor": "Onko ulkona omaa lämpötila-anturia?"
+        }
+      },
+      "wiz_sensors_details": {
+        "title": "Vaihe 1/5 — Valitse anturit tai kirjoita WiFi-anturin nimi",
+        "description": "Voit valita listasta yhden tai useamman Home Assistant -anturin JA/TAI kirjoittaa anturin WiFi-nimen (esim. Shelly H&T Yläkerta, RuuviTag Alakerta).",
+        "data": {
+          "upstairs_entities": "Yläkerran anturit (voi valita useamman)",
+          "upstairs_wifi_names": "Yläkerran WiFi-anturin nimi / tunniste (valinnainen)",
+          "downstairs_entities": "Alakerran anturit (voi valita useamman)",
+          "downstairs_wifi_names": "Alakerran WiFi-anturin nimi / tunniste (valinnainen)",
+          "outdoor_entities": "Ulkolämpötila-anturit",
+          "outdoor_wifi_names": "Ulkoanturin WiFi-nimi / tunniste (valinnainen)"
+        }
+      },
+      "wiz_water_yn": {
+        "title": "Vaihe 2/5 — Lämminvesivaraaja",
+        "description": "Onko kohteessa lämminvesivaraaja? Huom: Home Assistant ei katkaise 230/400 V virtaa ilman älyrelettä tai kontaktoria — jos varaajalla ei ole vielä WiFi-ohjausta, AI-Sähkövahti varaa silti sen tehon sulakekuormasta ja antaa valmiin suosituksen.",
+        "data": {
+          "has_water_heater": "Onko kohteessa lämminvesivaraaja?"
+        }
+      },
+      "wiz_water_details": {
+        "title": "Vaihe 2/5 — Lämminvesivaraajan tiedot",
+        "description": "Syötä varaajan nimi ja teho (kW). Jos varaajassa tai sen kontaktorissa ei ole vielä WiFi-relettä (esim. Shelly Pro 1PM), valitse WiFi-kohdassa 'Ei'.",
+        "data": {
+          "name": "Varaajan nimi",
+          "has_wifi_or_ha": "Onko varaaja tai sen kontaktori WiFi-verkossa / HA:ssa?",
+          "power_kw": "Varaajan teho (kW)",
+          "panel_group": "Sulakeryhmä / Keskus",
+          "cheapest_hours_needed": "Tarvittavat halvimmat tunnit vuorokaudessa (h)",
+          "control_entity_id": "HA-ohjausentiteetti (jos Kyllä)",
+          "wifi_device_note": "WiFi-releen tai kontaktorin lisätieto (valinnainen)"
+        }
+      },
+      "wiz_floor_yn": {
+        "title": "Vaihe 3/5 — Lattialämmitys",
+        "description": "Onko kohteessa sähköinen lattialämmitys? Jos vastaat Kyllä, voit syöttää yhden tai useamman huoneen sekä tiedon betoni- ja pintalämpötila-antureista.",
+        "data": {
+          "has_floor_heating": "Onko kohteessa lattialämmitys?",
+          "floor_scope": "Onko lattialämmitys yhdessä vai useammassa huoneessa?"
+        }
+      },
+      "wiz_floor_room": {
+        "title": "Vaihe 3/5 — Lattialämmityshuoneen tiedot",
+        "description": "Betonianturi mahdollistaa varaavan yölämmityksen halvimmille tunneille; pelkkä pintalämpötila-anturi ohjaa tasaisempia jaksoja, jotta lattia ei viilene.",
+        "data": {
+          "room_name": "Huoneen tai alueen nimi (esim. Kylpyhuone, Alakerta)",
+          "power_kw": "Lattialämmityksen teho (kW)",
+          "has_wifi_or_ha": "Onko huoneen termostaatti/rele WiFi-verkossa / HA:ssa?",
+          "has_concrete_sensor": "Onko betonianturia (laatta-anturia)?",
+          "slab_sensor_depth": "Betonianturin syvyys (jos Kyllä)",
+          "has_surface_sensor": "Onko pintalämpötilan / huoneilman anturia?",
+          "floor_temp_entity_id": "Lattian / huoneen lämpötila-anturi (valinnainen)",
+          "control_entity_id": "HA-ohjausentiteetti (valinnainen)",
+          "panel_group": "Sulakeryhmä / Keskus",
+          "add_another_room": "Haluatko lisätä seuraavan lattialämmityshuoneen?"
+        }
+      },
+      "wiz_ev_yn": {
+        "title": "Vaihe 4/5 — Sähköauto tai Latausasema",
+        "description": "Onko kohteessa sähköauto tai latausasema? Voit lisätä yhden tai useamman auton ja vaihtaa auton myöhemmin yhdellä klikkauksella ilman automaatioiden rikkoutumista.",
+        "data": {
+          "has_ev": "Onko kohteessa sähköauto tai latausasema?"
+        }
+      },
+      "wiz_ev_details": {
+        "title": "Vaihe 4/5 — Sähköauton / Laturin tiedot",
+        "description": "Voit yhdistää HA-ohjauksen (esim. Tesla, Easee, Zaptec) tai lisätä auton manuaalisena kuormana ilman nettiyhteyttä.",
+        "data": {
+          "name": "Auton tai latausaseman nimi",
+          "has_wifi_or_ha": "Onko auto tai laturi yhdistetty WiFiin / HA:han?",
+          "power_kw": "Latausteho (kW)",
+          "panel_group": "Sulakeryhmä / Keskus",
+          "cheapest_hours_needed": "Lataustuntien tarve vuorokaudessa (h)",
+          "control_entity_id": "HA-ohjausentiteetti (valinnainen)",
+          "wifi_device_note": "Lisätieto (valinnainen)",
+          "add_another_ev": "Lisätäänkö toinen sähköauto?"
+        }
+      },
+      "wiz_other_yn": {
+        "title": "Vaihe 5/5 — Ilmalämpöpumput, Sähköpatterit & Sauna",
+        "description": "Haluatko lisätä vielä ilmalämpöpumppuja (esim. Mitsubishi), ylä-/alakerran sähköpattereita tai saunan kiukaan?",
+        "data": {
+          "has_other_device": "Lisätäänkö ilmalämpöpumppu, sähköpatterit tai sauna?"
+        }
+      },
+      "wiz_other_details": {
+        "title": "Vaihe 5/5 — Lisää lämmityslaite tai kuorma",
+        "description": "Voit lisätä useamman laitteen peräkkäin valitsemalla alhaalta 'Kyllä'.",
+        "data": {
+          "category": "Laitetyyppi",
+          "name": "Laitteen tai huoneen nimi",
+          "has_wifi_or_ha": "Onko laite WiFi-verkossa / HA:ssa?",
+          "power_kw": "Teho (kW)",
+          "panel_group": "Sulakeryhmä / Keskus",
+          "cheapest_hours_needed": "Tarvittavat halvimmat tunnit (h)",
+          "control_entity_id": "HA-ohjausentiteetti (valinnainen)",
+          "wifi_device_note": "Lisätieto (valinnainen)",
+          "add_more_other": "Lisätäänkö vielä toinen laite tai huone?"
+        }
+      }
+    },
+    "error": {
+      "invalid_license_key": "Lisenssiavain ei ole voimassa tai tarkistus epäonnistui.",
+      "non_fi_requires_local_source": "Valitse FI:n ulkopuolella paikallinen HA-hintasensori tai oma API-osoite.",
+      "missing_source_entity": "Valitse Home Assistantin hintasensori.",
+      "missing_custom_url": "Syötä oman API-rajapinnan URL-osoite."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "AI-Sähkövahti — Plug & Play Hallintavalikko",
+        "description": "Valitse toiminto. Nykyisiä kohteita tallennettu: {device_count} kpl. Voit ajaa opastetun Kyllä/Ei-velhon, lisätä yksittäisen laitteen tai vaihtaa auton ilman YAML-tiedostoja.",
+        "data": {
+          "menu_action": "Mitä haluat tehdä?"
+        }
+      },
+      "wiz_sensors_yn": {
+        "title": "Vaihe 1/5 — Sähkösopimus & Lämpötila-anturit",
+        "description": "Valitse sähkösopimuksesi tyyppi (myös yösähkö/kausisähkö) ja kerro Kyllä/Ei lämpötila-antureista.",
+        "data": {
+          "tariff_type": "Sähkösopimuksen tyyppi",
+          "has_upstairs_sensor": "Onko yläkerrassa lämpötila-anturia?",
+          "has_downstairs_sensor": "Onko alakerrassa lämpötila-anturia?",
+          "has_outdoor_sensor": "Onko ulkona omaa lämpötila-anturia?"
+        }
+      },
+      "wiz_sensors_details": {
+        "title": "Vaihe 1/5 — Antureiden valinta",
+        "description": "Valitse yksi tai useampi anturi tai kirjoita WiFi-anturin nimi.",
+        "data": {
+          "upstairs_entities": "Yläkerran anturit",
+          "upstairs_wifi_names": "Yläkerran WiFi-anturin nimi",
+          "downstairs_entities": "Alakerran anturit",
+          "downstairs_wifi_names": "Alakerran WiFi-anturin nimi",
+          "outdoor_entities": "Ulkoanturit",
+          "outdoor_wifi_names": "Ulkoanturin WiFi-nimi"
+        }
+      },
+      "wiz_water_yn": {
+        "title": "Vaihe 2/5 — Lämminvesivaraaja",
+        "description": "Onko kohteessa lämminvesivaraaja?",
+        "data": {
+          "has_water_heater": "Onko kohteessa lämminvesivaraaja?"
+        }
+      },
+      "wiz_water_details": {
+        "title": "Vaihe 2/5 — Lämminvesivaraajan tiedot",
+        "description": "Syötä varaajan teho (kW) ja valitse, onko varaajassa tai kontaktorissa WiFi-ohjaus.",
+        "data": {
+          "name": "Varaajan nimi",
+          "has_wifi_or_ha": "Onko varaaja tai kontaktori WiFi-verkossa / HA:ssa?",
+          "power_kw": "Varaajan teho (kW)",
+          "panel_group": "Sulakeryhmä / Keskus",
+          "cheapest_hours_needed": "Tarvittavat halvimmat tunnit (h)",
+          "control_entity_id": "HA-ohjausentiteetti",
+          "wifi_device_note": "Lisätieto"
+        }
+      },
+      "wiz_floor_yn": {
+        "title": "Vaihe 3/5 — Lattialämmitys",
+        "description": "Onko kohteessa lattialämmitys?",
+        "data": {
+          "has_floor_heating": "Onko kohteessa lattialämmitys?",
+          "floor_scope": "Onko lattialämmitys yhdessä vai useammassa huoneessa?"
+        }
+      },
+      "wiz_floor_room": {
+        "title": "Vaihe 3/5 — Lattialämmityshuoneen tiedot",
+        "description": "Syötä huoneen nimi, teho sekä tieto betoni- ja pintalämpötila-antureista.",
+        "data": {
+          "room_name": "Huoneen nimi",
+          "power_kw": "Teho (kW)",
+          "has_wifi_or_ha": "Onko ohjaus WiFi-verkossa / HA:ssa?",
+          "has_concrete_sensor": "Onko betonianturia?",
+          "slab_sensor_depth": "Betonianturin syvyys",
+          "has_surface_sensor": "Onko pintalämpötila-anturia?",
+          "floor_temp_entity_id": "Lämpötila-anturi",
+          "control_entity_id": "HA-ohjausentiteetti",
+          "panel_group": "Sulakeryhmä",
+          "add_another_room": "Lisätäänkö seuraava huone?"
+        }
+      },
+      "wiz_ev_yn": {
+        "title": "Vaihe 4/5 — Sähköauto tai Latausasema",
+        "description": "Onko kohteessa sähköauto tai latausasema?",
+        "data": {
+          "has_ev": "Onko kohteessa sähköauto tai latausasema?"
+        }
+      },
+      "wiz_ev_details": {
+        "title": "Vaihe 4/5 — Sähköauton tiedot",
+        "description": "Voit lisätä useamman auton peräkkäin.",
+        "data": {
+          "name": "Auton nimi",
+          "has_wifi_or_ha": "Onko auto/laturi WiFi-verkossa / HA:ssa?",
+          "power_kw": "Latausteho (kW)",
+          "panel_group": "Sulakeryhmä",
+          "cheapest_hours_needed": "Tarvittavat tunnit (h)",
+          "control_entity_id": "HA-ohjausentiteetti",
+          "wifi_device_note": "Lisätieto",
+          "add_another_ev": "Lisätäänkö toinen sähköauto?"
+        }
+      },
+      "wiz_other_yn": {
+        "title": "Vaihe 5/5 — Muut laitteet (ILP, patterit, sauna)",
+        "description": "Lisätäänkö ilmalämpöpumppu, sähköpatterit tai sauna?",
+        "data": {
+          "has_other_device": "Lisätäänkö muu laite?"
+        }
+      },
+      "wiz_other_details": {
+        "title": "Vaihe 5/5 — Laitteen tiedot",
+        "description": "Voit lisätä useamman laitteen peräkkäin.",
+        "data": {
+          "category": "Laitetyyppi",
+          "name": "Nimi",
+          "has_wifi_or_ha": "Onko WiFi-verkossa / HA:ssa?",
+          "power_kw": "Teho (kW)",
+          "panel_group": "Sulakeryhmä",
+          "cheapest_hours_needed": "Tarvittavat tunnit (h)",
+          "control_entity_id": "HA-ohjausentiteetti",
+          "wifi_device_note": "Lisätieto",
+          "add_more_other": "Lisätäänkö vielä toinen laite?"
+        }
+      },
+      "add_device": {
+        "title": "Lisää yksittäinen laite tai huone",
+        "description": "Toimii myös täysin ilman nettiyhteyttä — syötä vain nimi, kategoria ja teho (kW).",
+        "data": {
+          "name": "Laitteen tai huoneen nimi",
+          "category": "Laitetyyppi",
+          "has_wifi_or_ha": "Onko WiFi-verkossa / HA:ssa?",
+          "power_kw": "Teho (kW)",
+          "panel_group": "Sulakeryhmä",
+          "cheapest_hours_needed": "Tarvittavat halvimmat tunnit (h)",
+          "control_entity_id": "HA-ohjausentiteetti (valinnainen)",
+          "wifi_device_note": "Lisätieto (valinnainen)"
+        }
+      },
+      "manage_devices": {
+        "title": "Hallitse tai poista laitteita",
+        "description": "Valitse poistettavat laitteet (esim. vanha sähköauto auton vaihdon yhteydessä).",
+        "data": {
+          "remove_ids": "Poistettavat laitteet"
+        }
+      },
+      "general_settings": {
+        "title": "Perusasetukset",
+        "description": "Muokkaa lisenssiavainta, hinta-aluetta, valuuttaa tai hintalähdettä.",
+        "data": {
+          "license_key": "Lisenssiavain",
+          "area": "Hinta-alue",
+          "currency_choice": "Valuutta",
+          "price_source_mode": "Hintalähde",
+          "source_entity_id": "HA-hintasensori",
+          "price_attribute": "Hinta-attribuutti",
+          "price_multiplier": "Yksikkökerroin",
+          "custom_price_url": "Oma API-osoite",
+          "custom_api_key": "Oman API:n avain"
+        }
+      }
+    }
+  }
+}
