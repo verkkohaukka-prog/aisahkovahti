@@ -1,0 +1,292 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "AI-Sähkövahti — Licens & Elområde",
+        "description": "Ange din personliga licensnyckel (Pro / VIP) eller gratis 24h-testnyckel. Därefter hjälper den guidade Ja/Nej-guiden dig att lägga till temperatursensorer, varmvattenberedare, golvvärme, elbilar och värmepumpar utan YAML-kodning.",
+        "data": {
+          "license_key": "Licensnyckel",
+          "area": "Elområde (t.ex. FI, SE1, SE2, SE3, SE4)",
+          "currency_choice": "Valuta",
+          "price_source_mode": "Priskälla",
+          "source_entity_id": "Egen Home Assistant-prissensor (t.ex. Nord Pool / Tibber)",
+          "price_attribute": "Prisattribut (standard: auto)",
+          "price_multiplier": "Enhetsmultiplikator (standard: 1.0)",
+          "custom_price_url": "Egen API-adress (valfritt)",
+          "custom_api_key": "Egen API-nyckel (valfritt)"
+        }
+      },
+      "wiz_sensors_yn": {
+        "title": "Steg 1/5 — Elavtal & Temperatursensorer",
+        "description": "Välj typ av elavtal (även nattaxa/tidstariff stöds) och svara Ja/Nej om det finns temperatursensorer på övervåningen, nedervåningen eller utomhus. Du kan även svara Nej på alla.",
+        "data": {
+          "tariff_type": "Typ av elavtal",
+          "has_upstairs_sensor": "Finns det en temperatursensor på övervåningen?",
+          "has_downstairs_sensor": "Finns det en temperatursensor på nedervåningen?",
+          "has_outdoor_sensor": "Finns det en utomhustemperatursensor?"
+        }
+      },
+      "wiz_sensors_details": {
+        "title": "Steg 1/5 — Välj sensorer eller ange WiFi-sensorns namn",
+        "description": "Välj en eller flera Home Assistant-sensorer i listan OCH/ELLER ange WiFi-sensorns namn (t.ex. Shelly H&T Övervåning, RuuviTag Nedervåning).",
+        "data": {
+          "upstairs_entities": "Sensorer på övervåningen (flera möjliga)",
+          "upstairs_wifi_names": "WiFi-sensorns namn på övervåningen (valfritt)",
+          "downstairs_entities": "Sensorer på nedervåningen (flera möjliga)",
+          "downstairs_wifi_names": "WiFi-sensorns namn på nedervåningen (valfritt)",
+          "outdoor_entities": "Utomhustemperatursensorer",
+          "outdoor_wifi_names": "Utomhussensorns WiFi-namn (valfritt)"
+        }
+      },
+      "wiz_water_yn": {
+        "title": "Steg 2/5 — Varmvattenberedare",
+        "description": "Finns det en elektrisk varmvattenberedare? Obs: Home Assistant kan inte bryta 230/400 V ström utan smart relä eller kontaktor — om beredaren saknar WiFi-styrning reserverar AI-Sähkövahti ändå dess effekt i säkringsskyddet och ger en rekommendation.",
+        "data": {
+          "has_water_heater": "Finns det en varmvattenberedare?"
+        }
+      },
+      "wiz_water_details": {
+        "title": "Steg 2/5 — Uppgifter om varmvattenberedare",
+        "description": "Ange beredarens namn och effekt (kW). Om beredaren eller dess kontaktor ännu inte har ett WiFi-relä (t.ex. Shelly Pro 1PM), välj 'Nej' vid WiFi/HA-anslutning.",
+        "data": {
+          "name": "Beredarens namn",
+          "has_wifi_or_ha": "Är beredaren eller dess kontaktor ansluten till WiFi / HA?",
+          "power_kw": "Beredarens effekt (kW)",
+          "panel_group": "Säkringsgrupp / Elcentral",
+          "cheapest_hours_needed": "Antal billigaste timmar per dygn som behövs (h)",
+          "control_entity_id": "HA-styrenhet (om Ja)",
+          "wifi_device_note": "Anteckning om WiFi-relä eller kontaktor (valfritt)"
+        }
+      },
+      "wiz_floor_yn": {
+        "title": "Steg 3/5 — Elektrisk golvvärme",
+        "description": "Finns det elektrisk golvvärme? Om Ja kan du konfigurera ett eller flera rum samt information om betong- och ytsensorer.",
+        "data": {
+          "has_floor_heating": "Finns det elektrisk golvvärme?",
+          "floor_scope": "Finns golvvärmen i ett rum eller i flera rum?"
+        }
+      },
+      "wiz_floor_room": {
+        "title": "Steg 3/5 — Uppgifter om golvvärmerum",
+        "description": "En betongsensor möjliggör värmelagrande förvärmning under nattens billigaste timmar; enbart ytsensor ger kortare, jämnare värmecykler så att golvet inte blir kallt.",
+        "data": {
+          "room_name": "Rummets eller zonens namn (t.ex. Badrum, Nedervåning)",
+          "power_kw": "Golvvärmens effekt (kW)",
+          "has_wifi_or_ha": "Är rummets termostat/relä ansluten till WiFi / HA?",
+          "has_concrete_sensor": "Finns det en betongsensor (plattgivare)?",
+          "slab_sensor_depth": "Betongsensorns djup (om Ja)",
+          "has_surface_sensor": "Finns det en yttemperatur- eller rumsgivare?",
+          "floor_temp_entity_id": "Golv- / rumstemperatursensor (valfritt)",
+          "control_entity_id": "HA-styrenhet (valfritt)",
+          "panel_group": "Säkringsgrupp / Elcentral",
+          "add_another_room": "Lägg till nästa golvvärmerum?"
+        }
+      },
+      "wiz_ev_yn": {
+        "title": "Steg 4/5 — Elbil eller Laddbox",
+        "description": "Finns det en elbil eller laddbox? Du kan lägga till en eller flera bilar och byta bil senare med ett klick utan att automationer slutar fungera.",
+        "data": {
+          "has_ev": "Finns det en elbil eller laddbox?"
+        }
+      },
+      "wiz_ev_details": {
+        "title": "Steg 4/5 — Uppgifter om elbil / laddbox",
+        "description": "Anslut en HA-styrenhet (t.ex. Tesla, Easee, Zaptec) eller lägg till bilen som manuell last utan nätverksanslutning.",
+        "data": {
+          "name": "Bilens eller laddboxens namn",
+          "has_wifi_or_ha": "Är bilen eller laddboxen ansluten till WiFi / HA?",
+          "power_kw": "Laddeffekt (kW)",
+          "panel_group": "Säkringsgrupp / Elcentral",
+          "cheapest_hours_needed": "Laddtimmar som behövs per dygn (h)",
+          "control_entity_id": "HA-styrenhet (valfritt)",
+          "wifi_device_note": "Ytterligare information (valfritt)",
+          "add_another_ev": "Lägg till en andra elbil?"
+        }
+      },
+      "wiz_other_yn": {
+        "title": "Steg 5/5 — Värmepumpar, Elradiatorer & Bastu",
+        "description": "Vill du lägga till luft-vatten-/luftvärmepumpar (t.ex. Mitsubishi, NIBE), elradiatorer på över-/nedervåning eller bastuaggregat?",
+        "data": {
+          "has_other_device": "Lägg till värmepump, elradiatorer eller bastu?"
+        }
+      },
+      "wiz_other_details": {
+        "title": "Steg 5/5 — Lägg till värmeenhet eller last",
+        "description": "Du kan lägga till flera enheter i rad genom att välja 'Ja' längst ner.",
+        "data": {
+          "category": "Enhetstyp",
+          "name": "Enhetens eller rummets namn",
+          "has_wifi_or_ha": "Är enheten ansluten till WiFi / HA?",
+          "power_kw": "Effekt (kW)",
+          "panel_group": "Säkringsgrupp / Elcentral",
+          "cheapest_hours_needed": "Billigaste timmar som behövs per dygn (h)",
+          "control_entity_id": "HA-styrenhet (valfritt)",
+          "wifi_device_note": "Ytterligare information (valfritt)",
+          "add_more_other": "Lägg till ytterligare en enhet eller ett rum?"
+        }
+      }
+    },
+    "error": {
+      "invalid_license_key": "Licensnyckeln är ogiltig eller verifieringen misslyckades.",
+      "non_fi_requires_local_source": "Utanför FI, välj en lokal HA-prissensor eller en egen API-adress.",
+      "missing_source_entity": "Välj en Home Assistant-prissensor.",
+      "missing_custom_url": "Ange URL-adressen till ditt eget API."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "AI-Sähkövahti — Plug & Play Kontrollmeny",
+        "description": "Välj åtgärd. Sparade enheter just nu: {device_count} st. Kör den guidade Ja/Nej-guiden, lägg till en enskild enhet eller byt elbil utan att redigera YAML-filer.",
+        "data": {
+          "menu_action": "Vad vill du göra?"
+        }
+      },
+      "wiz_sensors_yn": {
+        "title": "Steg 1/5 — Elavtal & Temperatursensorer",
+        "description": "Välj typ av elavtal (inklusive nattaxa/tidstariff) och svara Ja/Nej för temperatursensorer.",
+        "data": {
+          "tariff_type": "Typ av elavtal",
+          "has_upstairs_sensor": "Finns det en temperatursensor på övervåningen?",
+          "has_downstairs_sensor": "Finns det en temperatursensor på nedervåningen?",
+          "has_outdoor_sensor": "Finns det en utomhustemperatursensor?"
+        }
+      },
+      "wiz_sensors_details": {
+        "title": "Steg 1/5 — Välj sensorer",
+        "description": "Välj en eller flera sensorer eller ange WiFi-sensorns namn.",
+        "data": {
+          "upstairs_entities": "Sensorer på övervåningen",
+          "upstairs_wifi_names": "WiFi-sensorns namn på övervåningen",
+          "downstairs_entities": "Sensorer på nedervåningen",
+          "downstairs_wifi_names": "WiFi-sensorns namn på nedervåningen",
+          "outdoor_entities": "Utomhussensorer",
+          "outdoor_wifi_names": "Utomhussensorns WiFi-namn"
+        }
+      },
+      "wiz_water_yn": {
+        "title": "Steg 2/5 — Varmvattenberedare",
+        "description": "Finns det en varmvattenberedare?",
+        "data": {
+          "has_water_heater": "Finns det en varmvattenberedare?"
+        }
+      },
+      "wiz_water_details": {
+        "title": "Steg 2/5 — Uppgifter om varmvattenberedare",
+        "description": "Ange effekt (kW) och om beredaren eller kontaktorn har WiFi-styrning.",
+        "data": {
+          "name": "Beredarens namn",
+          "has_wifi_or_ha": "Är beredaren eller kontaktorn ansluten till WiFi / HA?",
+          "power_kw": "Beredarens effekt (kW)",
+          "panel_group": "Säkringsgrupp / Elcentral",
+          "cheapest_hours_needed": "Timmar som behövs (h)",
+          "control_entity_id": "HA-styrenhet",
+          "wifi_device_note": "Ytterligare information"
+        }
+      },
+      "wiz_floor_yn": {
+        "title": "Steg 3/5 — Elektrisk golvvärme",
+        "description": "Finns det elektrisk golvvärme?",
+        "data": {
+          "has_floor_heating": "Finns det elektrisk golvvärme?",
+          "floor_scope": "Ett rum eller flera rum?"
+        }
+      },
+      "wiz_floor_room": {
+        "title": "Steg 3/5 — Uppgifter om golvvärmerum",
+        "description": "Ange rummets namn, effekt samt betong- och yttemperatursensorer.",
+        "data": {
+          "room_name": "Rummets namn",
+          "power_kw": "Effekt (kW)",
+          "has_wifi_or_ha": "Ansluten till WiFi / HA?",
+          "has_concrete_sensor": "Har betongsensor?",
+          "slab_sensor_depth": "Betongsensorns djup",
+          "has_surface_sensor": "Har yttemperatursensor?",
+          "floor_temp_entity_id": "Temperatursensor",
+          "control_entity_id": "HA-styrenhet",
+          "panel_group": "Säkringsgrupp",
+          "add_another_room": "Lägg till nästa rum?"
+        }
+      },
+      "wiz_ev_yn": {
+        "title": "Steg 4/5 — Elbil eller Laddbox",
+        "description": "Finns det en elbil eller laddbox?",
+        "data": {
+          "has_ev": "Finns det en elbil eller laddbox?"
+        }
+      },
+      "wiz_ev_details": {
+        "title": "Steg 4/5 — Uppgifter om elbil",
+        "description": "Du kan lägga till flera bilar i rad.",
+        "data": {
+          "name": "Bilens namn",
+          "has_wifi_or_ha": "Ansluten till WiFi / HA?",
+          "power_kw": "Laddeffekt (kW)",
+          "panel_group": "Säkringsgrupp",
+          "cheapest_hours_needed": "Timmar som behövs (h)",
+          "control_entity_id": "HA-styrenhet",
+          "wifi_device_note": "Ytterligare information",
+          "add_another_ev": "Lägg till en andra elbil?"
+        }
+      },
+      "wiz_other_yn": {
+        "title": "Steg 5/5 — Övriga enheter (Värmepumpar, Radiatorer, Bastu)",
+        "description": "Lägg till värmepump, elradiatorer eller bastu?",
+        "data": {
+          "has_other_device": "Lägg till en till enhet?"
+        }
+      },
+      "wiz_other_details": {
+        "title": "Steg 5/5 — Uppgifter om enhet",
+        "description": "Du kan lägga till flera enheter i rad.",
+        "data": {
+          "category": "Enhetstyp",
+          "name": "Namn",
+          "has_wifi_or_ha": "Ansluten till WiFi / HA?",
+          "power_kw": "Effekt (kW)",
+          "panel_group": "Säkringsgrupp",
+          "cheapest_hours_needed": "Timmar som behövs (h)",
+          "control_entity_id": "HA-styrenhet",
+          "wifi_device_note": "Ytterligare information",
+          "add_more_other": "Lägg till ytterligare en enhet?"
+        }
+      },
+      "add_device": {
+        "title": "Lägg till enskild enhet eller rum",
+        "description": "Fungerar helt offline också — ange bara namn, kategori och effekt (kW).",
+        "data": {
+          "name": "Enhetens eller rummets namn",
+          "category": "Enhetstyp",
+          "has_wifi_or_ha": "Ansluten till WiFi / HA?",
+          "power_kw": "Effekt (kW)",
+          "panel_group": "Säkringsgrupp",
+          "cheapest_hours_needed": "Billigaste timmar som behövs (h)",
+          "control_entity_id": "HA-styrenhet (valfritt)",
+          "wifi_device_note": "Ytterligare information (valfritt)"
+        }
+      },
+      "manage_devices": {
+        "title": "Hantera eller ta bort enheter",
+        "description": "Välj enheter att ta bort (t.ex. en gammal elbil vid bilbyte).",
+        "data": {
+          "remove_ids": "Enheter att ta bort"
+        }
+      },
+      "general_settings": {
+        "title": "Grundinställningar",
+        "description": "Redigera licensnyckel, elområde, valuta eller priskälla.",
+        "data": {
+          "license_key": "Licensnyckel",
+          "area": "Elområde",
+          "currency_choice": "Valuta",
+          "price_source_mode": "Priskälla",
+          "source_entity_id": "HA-prissensor",
+          "price_attribute": "Prisattribut",
+          "price_multiplier": "Enhetsmultiplikator",
+          "custom_price_url": "Egen API-adress",
+          "custom_api_key": "Egen API-nyckel"
+        }
+      }
+    }
+  }
+}
