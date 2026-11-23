@@ -1,0 +1,292 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "AI-Sähkövahti — Licencia y Zona de precios",
+        "description": "Introduce tu clave de licencia personal (Pro / VIP) o tu clave de prueba gratuita de 24h. A continuación, el asistente guiado Sí/No te ayudará a configurar sensores de temperatura, termo eléctrico, suelo radiante, coches eléctricos y bombas de calor sin escribir código YAML.",
+        "data": {
+          "license_key": "Clave de licencia",
+          "area": "Zona de precios (ej. ES, FI, SE3, DE)",
+          "currency_choice": "Moneda",
+          "price_source_mode": "Fuente de precios",
+          "source_entity_id": "Sensor de precios propio de Home Assistant (ej. PVPC / Nord Pool / ENTSO-E)",
+          "price_attribute": "Atributo de precio (por defecto: auto)",
+          "price_multiplier": "Multiplicador de unidad (por defecto: 1.0)",
+          "custom_price_url": "URL de API personalizada (opcional)",
+          "custom_api_key": "Clave de API personalizada (opcional)"
+        }
+      },
+      "wiz_sensors_yn": {
+        "title": "Paso 1/5 — Tarifa eléctrica y Sensores de temperatura",
+        "description": "Selecciona tu tipo de tarifa eléctrica (también admite tarifa nocturna / discriminación horaria) y responde Sí/No si tienes sensores de temperatura en la planta superior, planta baja o exterior. También puedes responder No a todo.",
+        "data": {
+          "tariff_type": "Tipo de tarifa eléctrica",
+          "has_upstairs_sensor": "¿Tienes sensor de temperatura en la planta superior?",
+          "has_downstairs_sensor": "¿Tienes sensor de temperatura en la planta baja?",
+          "has_outdoor_sensor": "¿Tienes sensor de temperatura exterior?"
+        }
+      },
+      "wiz_sensors_details": {
+        "title": "Paso 1/5 — Seleccionar sensores o escribir nombre WiFi",
+        "description": "Selecciona uno o varios sensores de Home Assistant de la lista Y/O escribe el nombre del sensor WiFi (ej. Shelly H&T Planta Alta).",
+        "data": {
+          "upstairs_entities": "Sensores de planta superior (varios permitidos)",
+          "upstairs_wifi_names": "Nombre del sensor WiFi planta superior (opcional)",
+          "downstairs_entities": "Sensores de planta baja (varios permitidos)",
+          "downstairs_wifi_names": "Nombre del sensor WiFi planta baja (opcional)",
+          "outdoor_entities": "Sensores de temperatura exterior",
+          "outdoor_wifi_names": "Nombre del sensor WiFi exterior (opcional)"
+        }
+      },
+      "wiz_water_yn": {
+        "title": "Paso 2/5 — Termo eléctrico de agua caliente",
+        "description": "¿Tienes termo eléctrico? Nota: Home Assistant no puede cortar corriente de 230/400 V sin relé inteligente o contactor — si aún no tiene WiFi, AI-Sähkövahti igualmente reserva su potencia para proteger el ICP/magnetotérmico y te ofrece una recomendación.",
+        "data": {
+          "has_water_heater": "¿Tienes termo eléctrico de agua caliente?"
+        }
+      },
+      "wiz_water_details": {
+        "title": "Paso 2/5 — Datos del termo eléctrico",
+        "description": "Introduce el nombre y la potencia (kW). Si el termo o su contactor aún no tienen relé WiFi (ej. Shelly Pro 1PM), selecciona «No» en conexión WiFi/HA.",
+        "data": {
+          "name": "Nombre del termo",
+          "has_wifi_or_ha": "¿Está el termo o su contactor conectado a WiFi / HA?",
+          "power_kw": "Potencia del termo (kW)",
+          "panel_group": "Grupo de magnetotérmicos / Cuadro eléctrico",
+          "cheapest_hours_needed": "Horas más baratas necesarias al día (h)",
+          "control_entity_id": "Entidad de control HA (si Sí)",
+          "wifi_device_note": "Nota sobre relé WiFi o contactor (opcional)"
+        }
+      },
+      "wiz_floor_yn": {
+        "title": "Paso 3/5 — Suelo radiante eléctrico",
+        "description": "¿Tienes suelo radiante eléctrico? Si respondes Sí, podrás configurar una o varias habitaciones junto con sondas de solera de hormigón y de superficie.",
+        "data": {
+          "has_floor_heating": "¿Tienes suelo radiante eléctrico?",
+          "floor_scope": "¿En una sola habitación o en varias habitaciones?"
+        }
+      },
+      "wiz_floor_room": {
+        "title": "Paso 3/5 — Datos de la habitación con suelo radiante",
+        "description": "Una sonda en la solera de hormigón permite acumular calor en las horas valle más baratas; una sonda de superficie utiliza ciclos cortos y estables para evitar que el suelo se enfríe.",
+        "data": {
+          "room_name": "Nombre de la habitación o zona (ej. Baño, Salón)",
+          "power_kw": "Potencia del suelo radiante (kW)",
+          "has_wifi_or_ha": "¿Está el termostato/relé conectado a WiFi / HA?",
+          "has_concrete_sensor": "¿Tiene sonda en solera de hormigón?",
+          "slab_sensor_depth": "Profundidad de la sonda de hormigón (si Sí)",
+          "has_surface_sensor": "¿Tiene sonda de temperatura superficial / ambiente?",
+          "floor_temp_entity_id": "Sensor de temperatura de suelo / habitación (opcional)",
+          "control_entity_id": "Entidad de control HA (opcional)",
+          "panel_group": "Grupo de magnetotérmicos / Cuadro eléctrico",
+          "add_another_room": "¿Añadir otra habitación con suelo radiante?"
+        }
+      },
+      "wiz_ev_yn": {
+        "title": "Paso 4/5 — Coche eléctrico o Cargador",
+        "description": "¿Tienes coche eléctrico o punto de recarga? Puedes añadir uno o varios vehículos y cambiar de coche más adelante con un clic sin romper las automatizaciones.",
+        "data": {
+          "has_ev": "¿Tienes coche eléctrico o cargador?"
+        }
+      },
+      "wiz_ev_details": {
+        "title": "Paso 4/5 — Datos del coche eléctrico / Cargador",
+        "description": "Conecta una entidad HA (ej. Tesla, Easee, Zaptec) o añade el vehículo como carga manual sin conexión a internet.",
+        "data": {
+          "name": "Nombre del vehículo o cargador",
+          "has_wifi_or_ha": "¿Está el vehículo o cargador conectado a WiFi / HA?",
+          "power_kw": "Potencia de carga (kW)",
+          "panel_group": "Grupo de magnetotérmicos / Cuadro eléctrico",
+          "cheapest_hours_needed": "Horas de carga necesarias al día (h)",
+          "control_entity_id": "Entidad de control HA (opcional)",
+          "wifi_device_note": "Nota adicional (opcional)",
+          "add_another_ev": "¿Añadir un segundo coche eléctrico?"
+        }
+      },
+      "wiz_other_yn": {
+        "title": "Paso 5/5 — Bombas de calor, Radiadores eléctricos y Sauna",
+        "description": "¿Quieres añadir bombas de calor / aerotermia (ej. Mitsubishi, NIBE), radiadores eléctricos o sauna?",
+        "data": {
+          "has_other_device": "¿Añadir bomba de calor, radiadores o sauna?"
+        }
+      },
+      "wiz_other_details": {
+        "title": "Paso 5/5 — Añadir equipo de calefacción o carga",
+        "description": "Puedes añadir varios equipos seguidos seleccionando «Sí» abajo.",
+        "data": {
+          "category": "Tipo de dispositivo",
+          "name": "Nombre del dispositivo o habitación",
+          "has_wifi_or_ha": "¿Está conectado a WiFi / HA?",
+          "power_kw": "Potencia (kW)",
+          "panel_group": "Grupo de magnetotérmicos / Cuadro eléctrico",
+          "cheapest_hours_needed": "Horas más baratas necesarias al día (h)",
+          "control_entity_id": "Entidad de control HA (opcional)",
+          "wifi_device_note": "Nota adicional (opcional)",
+          "add_more_other": "¿Añadir otro dispositivo o habitación?"
+        }
+      }
+    },
+    "error": {
+      "invalid_license_key": "La clave de licencia no es válida o falló la verificación.",
+      "non_fi_requires_local_source": "Fuera de FI, selecciona un sensor de precios local en HA o una URL de API personalizada.",
+      "missing_source_entity": "Selecciona un sensor de precios de Home Assistant.",
+      "missing_custom_url": "Introduce la URL de tu API personalizada."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "AI-Sähkövahti — Menú de control Plug & Play",
+        "description": "Elige una acción. Dispositivos guardados: {device_count}. Ejecuta el asistente guiado Sí/No, añade un dispositivo individual o cambia de coche eléctrico sin editar archivos YAML.",
+        "data": {
+          "menu_action": "¿Qué deseas hacer?"
+        }
+      },
+      "wiz_sensors_yn": {
+        "title": "Paso 1/5 — Tarifa eléctrica y Sensores",
+        "description": "Selecciona tu tarifa (incluida tarifa nocturna) y responde Sí/No para los sensores de temperatura.",
+        "data": {
+          "tariff_type": "Tipo de tarifa eléctrica",
+          "has_upstairs_sensor": "¿Sensor de temperatura en planta superior?",
+          "has_downstairs_sensor": "¿Sensor de temperatura en planta baja?",
+          "has_outdoor_sensor": "¿Sensor de temperatura exterior?"
+        }
+      },
+      "wiz_sensors_details": {
+        "title": "Paso 1/5 — Seleccionar sensores",
+        "description": "Selecciona uno o varios sensores o escribe el nombre del sensor WiFi.",
+        "data": {
+          "upstairs_entities": "Sensores planta superior",
+          "upstairs_wifi_names": "Nombre sensor WiFi planta superior",
+          "downstairs_entities": "Sensores planta baja",
+          "downstairs_wifi_names": "Nombre sensor WiFi planta baja",
+          "outdoor_entities": "Sensores exteriores",
+          "outdoor_wifi_names": "Nombre sensor WiFi exterior"
+        }
+      },
+      "wiz_water_yn": {
+        "title": "Paso 2/5 — Termo eléctrico",
+        "description": "¿Tienes termo eléctrico de agua caliente?",
+        "data": {
+          "has_water_heater": "¿Tienes termo eléctrico?"
+        }
+      },
+      "wiz_water_details": {
+        "title": "Paso 2/5 — Datos del termo eléctrico",
+        "description": "Introduce la potencia (kW) y si el termo o contactor tiene control WiFi.",
+        "data": {
+          "name": "Nombre del termo",
+          "has_wifi_or_ha": "¿Conectado a WiFi / HA?",
+          "power_kw": "Potencia (kW)",
+          "panel_group": "Grupo eléctrico",
+          "cheapest_hours_needed": "Horas necesarias (h)",
+          "control_entity_id": "Entidad de control HA",
+          "wifi_device_note": "Nota adicional"
+        }
+      },
+      "wiz_floor_yn": {
+        "title": "Paso 3/5 — Suelo radiante eléctrico",
+        "description": "¿Tienes suelo radiante eléctrico?",
+        "data": {
+          "has_floor_heating": "¿Tienes suelo radiante eléctrico?",
+          "floor_scope": "¿Una habitación o varias habitaciones?"
+        }
+      },
+      "wiz_floor_room": {
+        "title": "Paso 3/5 — Datos de la habitación",
+        "description": "Introduce nombre de habitación, potencia y sondas de hormigón/superficie.",
+        "data": {
+          "room_name": "Nombre de la habitación",
+          "power_kw": "Potencia (kW)",
+          "has_wifi_or_ha": "¿Conectado a WiFi / HA?",
+          "has_concrete_sensor": "¿Tiene sonda en hormigón?",
+          "slab_sensor_depth": "Profundidad de la sonda",
+          "has_surface_sensor": "¿Tiene sonda de superficie?",
+          "floor_temp_entity_id": "Sensor de temperatura",
+          "control_entity_id": "Entidad de control HA",
+          "panel_group": "Grupo eléctrico",
+          "add_another_room": "¿Añadir siguiente habitación?"
+        }
+      },
+      "wiz_ev_yn": {
+        "title": "Paso 4/5 — Coche eléctrico o Cargador",
+        "description": "¿Tienes coche eléctrico o cargador?",
+        "data": {
+          "has_ev": "¿Tienes coche eléctrico o cargador?"
+        }
+      },
+      "wiz_ev_details": {
+        "title": "Paso 4/5 — Datos del coche eléctrico",
+        "description": "Puedes añadir varios vehículos seguidos.",
+        "data": {
+          "name": "Nombre del vehículo",
+          "has_wifi_or_ha": "¿Conectado a WiFi / HA?",
+          "power_kw": "Potencia de carga (kW)",
+          "panel_group": "Grupo eléctrico",
+          "cheapest_hours_needed": "Horas necesarias (h)",
+          "control_entity_id": "Entidad de control HA",
+          "wifi_device_note": "Nota adicional",
+          "add_another_ev": "¿Añadir un segundo coche eléctrico?"
+        }
+      },
+      "wiz_other_yn": {
+        "title": "Paso 5/5 — Otros equipos (Bombas de calor, Radiadores, Sauna)",
+        "description": "¿Añadir bomba de calor, radiadores o sauna?",
+        "data": {
+          "has_other_device": "¿Añadir otro equipo?"
+        }
+      },
+      "wiz_other_details": {
+        "title": "Paso 5/5 — Datos del equipo",
+        "description": "Puedes añadir varios equipos seguidos.",
+        "data": {
+          "category": "Tipo de dispositivo",
+          "name": "Nombre",
+          "has_wifi_or_ha": "¿Conectado a WiFi / HA?",
+          "power_kw": "Potencia (kW)",
+          "panel_group": "Grupo eléctrico",
+          "cheapest_hours_needed": "Horas necesarias (h)",
+          "control_entity_id": "Entidad de control HA",
+          "wifi_device_note": "Nota adicional",
+          "add_more_other": "¿Añadir otro equipo?"
+        }
+      },
+      "add_device": {
+        "title": "Añadir dispositivo o habitación",
+        "description": "Funciona también sin conexión a internet — solo introduce nombre, categoría y potencia (kW).",
+        "data": {
+          "name": "Nombre del dispositivo o habitación",
+          "category": "Tipo de dispositivo",
+          "has_wifi_or_ha": "¿Conectado a WiFi / HA?",
+          "power_kw": "Potencia (kW)",
+          "panel_group": "Grupo eléctrico",
+          "cheapest_hours_needed": "Horas más baratas necesarias (h)",
+          "control_entity_id": "Entidad de control HA (opcional)",
+          "wifi_device_note": "Nota adicional (opcional)"
+        }
+      },
+      "manage_devices": {
+        "title": "Gestionar o eliminar dispositivos",
+        "description": "Selecciona los dispositivos que deseas eliminar (ej. vehículo anterior al cambiar de coche).",
+        "data": {
+          "remove_ids": "Dispositivos a eliminar"
+        }
+      },
+      "general_settings": {
+        "title": "Configuración general",
+        "description": "Editar clave de licencia, zona de precios, moneda o fuente de precios.",
+        "data": {
+          "license_key": "Clave de licencia",
+          "area": "Zona de precios",
+          "currency_choice": "Moneda",
+          "price_source_mode": "Fuente de precios",
+          "source_entity_id": "Sensor de precios HA",
+          "price_attribute": "Atributo de precio",
+          "price_multiplier": "Multiplicador de unidad",
+          "custom_price_url": "URL de API personalizada",
+          "custom_api_key": "Clave de API personalizada"
+        }
+      }
+    }
+  }
+}
