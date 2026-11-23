@@ -57,6 +57,63 @@ def _load_device_profiles(config_dir: str) -> dict:
     return result
 
 
+def _merge_ui_devices_into_profiles(
+    profiles: dict, ui_devices: list | None, upcoming: list[dict]
+) -> dict:
+    """Yhdistää käyttöliittymästä lisätyt laitteet (myös verkkoyhteydettömät) profiileihin ja laskee optimitunnit."""
+    merged = {
+        "cars": list(profiles.get("cars", [])),
+        "heat_pumps": list(profiles.get("heat_pumps", [])),
+        "heating_circuits": list(profiles.get("heating_circuits", [])),
+        "panels": list(profiles.get("panels", [])),
+        "safety": dict(profiles.get("safety", {})),
+        "ui_devices": [],
+        "all_devices": [],
+    }
+
+    if not isinstance(ui_devices, list) or not ui_devices:
+        return merged
+
+    sorted_by_price = sorted(
+        [e for e in upcoming if isinstance(e, dict) and e.get("price") is not None],
+        key=lambda x: x["price"],
+    )
+
+    for dev in ui_devices:
+        if not isinstance(dev, dict):
+            continue
+        hours_needed = max(1, min(24, int(dev.get("cheapest_hours_needed", 3))))
+        chosen = sorted_by_price[:hours_needed]
+        chosen_chrono = sorted(chosen, key=lambda x: x.get("start", ""))
+        scheduled_hours = [
+            e.get("hour_label") or e.get("hour") or ""
+            for e in chosen_chrono
+            if (e.get("hour_label") or e.get("hour"))
+        ]
+        if not scheduled_hours:
+            scheduled_hours = ["02:00", "03:00", "04:00"][:hours_needed]
+
+        control_entity = (dev.get("control_entity_id") or "").strip()
+        enriched = {
+            **dev,
+            "has_network_control": bool(control_entity),
+            "control_mode": "ha_entity" if control_entity else "manual_no_network",
+            "scheduled_hours": scheduled_hours,
+        }
+        merged["ui_devices"].append(enriched)
+        merged["all_devices"].append(enriched)
+
+        category = dev.get("category", "other")
+        if category == "ev_charger":
+            merged["cars"].append(enriched)
+        elif category == "heat_pump":
+            merged["heat_pumps"].append(enriched)
+        elif category in ("heating_circuit", "water_heater", "sauna"):
+            merged["heating_circuits"].append(enriched)
+
+    return merged
+
+
 def _parse_dt(val) -> datetime | None:
     """Muuntaa ISO-aikaleiman tai datetime-olion aikavyöhykkeelliseksi datetimeksi."""
     if isinstance(val, datetime):
@@ -217,6 +274,7 @@ def _analyze_local_price_series(
     price_unit: str,
     profiles: dict,
     source_label: str,
+    ui_devices: list | None = None,
 ) -> dict:
     """Laskee halvimmat tunnit, hintapiikit ja keskiarvot paikallisesta hintasarjasta."""
     now_local = dt_util.now()
@@ -229,6 +287,8 @@ def _analyze_local_price_series(
     ]
     if not upcoming:
         upcoming = entries
+
+    merged_profiles = _merge_ui_devices_into_profiles(profiles, ui_devices, upcoming)
 
     if upcoming:
         prices = [e["price"] for e in upcoming]
@@ -279,7 +339,7 @@ def _analyze_local_price_series(
             }
             for e in upcoming[:48]
         ],
-        "device_profiles": profiles,
+        "device_profiles": merged_profiles,
     }
 
 
@@ -311,6 +371,7 @@ class AISahkovahtiDataCoordinator(DataUpdateCoordinator):
     def __init__(self, hass, config_data: dict):
         self.hass = hass
         self.config_data = dict(config_data)
+        self.ui_devices = list(self.config_data.get("ui_devices", []))
         self.license_key = self.config_data.get("license_key", "FREE")
         self.tier = self.config_data.get("tier", "pro")
         self.area = self.config_data.get("area", "FI").upper()
@@ -357,6 +418,7 @@ class AISahkovahtiDataCoordinator(DataUpdateCoordinator):
                     price_unit=self.price_unit,
                     profiles=profiles,
                     source_label=f"ha_entity:{self.source_entity_id}",
+                    ui_devices=self.ui_devices,
                 )
             _LOGGER.warning(
                 "Paikallinen hintasensori %s ei ole vielä valmis tai hintoja ei löytynyt",
@@ -401,6 +463,7 @@ class AISahkovahtiDataCoordinator(DataUpdateCoordinator):
                             price_unit=self.price_unit,
                             profiles=profiles,
                             source_label="custom_api",
+                            ui_devices=self.ui_devices,
                         )
             except Exception as err:
                 _LOGGER.warning("Oman API-osoitteen haku epäonnistui: %s", err)
@@ -436,7 +499,14 @@ class AISahkovahtiDataCoordinator(DataUpdateCoordinator):
                     data.setdefault("currency", self.currency)
                     data.setdefault("price_unit", self.price_unit)
                     data.setdefault("price_source", "server")
-                    data["device_profiles"] = profiles
+                    hourly_for_sched = [
+                        {"hour": h.get("hour"), "price": h.get("price")}
+                        for h in data.get("hourly_prices", [])
+                        if isinstance(h, dict) and h.get("price") is not None
+                    ]
+                    data["device_profiles"] = _merge_ui_devices_into_profiles(
+                        profiles, self.ui_devices, hourly_for_sched
+                    )
                     return data
         except Exception as error:
             _LOGGER.warning(
@@ -454,7 +524,9 @@ class AISahkovahtiDataCoordinator(DataUpdateCoordinator):
                 "spike_warning": False,
                 "min_water_temp_allowed": 55.0,
                 "legionella_status": "Turvallinen (Min. +55°C)",
-                "device_profiles": profiles,
+                "device_profiles": _merge_ui_devices_into_profiles(
+                    profiles, self.ui_devices, []
+                ),
             }
 
 
@@ -558,7 +630,11 @@ class AISahkovahtiDeviceProfilesSensor(CoordinatorEntity, SensorEntity):
         hp_count = len(profiles.get("heat_pumps", []))
         circuits_count = len(profiles.get("heating_circuits", []))
         panels_count = len(profiles.get("panels", []))
-        return f"Autot: {cars_count}, Pumput: {hp_count}, Piirit: {circuits_count}, Keskukset: {panels_count}"
+        ui_count = len(profiles.get("ui_devices", []))
+        return (
+            f"Laitteet: {ui_count} (Autot: {cars_count}, Pumput: {hp_count}, "
+            f"Piirit: {circuits_count}, Keskukset: {panels_count})"
+        )
 
     @property
     def extra_state_attributes(self):
@@ -566,6 +642,8 @@ class AISahkovahtiDeviceProfilesSensor(CoordinatorEntity, SensorEntity):
         return {
             "area": self.coordinator.data.get("area", self.coordinator.area),
             "currency": self.coordinator.data.get("currency", self.coordinator.currency),
+            "ui_devices": profiles.get("ui_devices", []),
+            "all_devices": profiles.get("all_devices", []),
             "cars": profiles.get("cars", []),
             "heat_pumps": profiles.get("heat_pumps", []),
             "heating_circuits": profiles.get("heating_circuits", []),
