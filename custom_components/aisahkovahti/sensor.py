@@ -1,7 +1,7 @@
 import os
 import logging
 from datetime import datetime, timedelta
-from urllib.parse import quote
+from urllib.parse import urlencode
 import yaml
 import async_timeout
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
@@ -406,13 +406,15 @@ class AISahkovahtiDataCoordinator(DataUpdateCoordinator):
                 _LOGGER.warning("Oman API-osoitteen haku epäonnistui: %s", err)
 
         # 3. AI-Sähkövahti palvelinrajapinta (oletus FI)
-        url = (
-            f"https://aisahkovahti.65.109.171.178.sslip.io/api/v1/forecast"
-            f"?key={quote(str(self.license_key))}"
-            f"&tier={quote(str(self.tier))}"
-            f"&area={quote(str(self.area))}"
-            f"¤cy={quote(str(self.currency))}"
+        query = urlencode(
+            {
+                "key": str(self.license_key),
+                "tier": str(self.tier),
+                "area": str(self.area),
+                "currency": str(self.currency),
+            }
         )
+        url = f"https://aisahkovahti.65.109.171.178.sslip.io/api/v1/forecast?{query}"
         session = async_get_clientsession(self.hass)
 
         try:
