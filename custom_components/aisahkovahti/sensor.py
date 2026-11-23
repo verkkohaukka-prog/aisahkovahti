@@ -58,7 +58,11 @@ def _load_device_profiles(config_dir: str) -> dict:
 
 
 def _merge_ui_devices_into_profiles(
-    profiles: dict, ui_devices: list | None, upcoming: list[dict]
+    profiles: dict,
+    ui_devices: list | None,
+    upcoming: list[dict],
+    temperature_sensors: dict | None = None,
+    wizard_recommendations: list[str] | None = None,
 ) -> dict:
     """Yhdistää käyttöliittymästä lisätyt laitteet (myös verkkoyhteydettömät) profiileihin ja laskee optimitunnit."""
     merged = {
@@ -69,6 +73,8 @@ def _merge_ui_devices_into_profiles(
         "safety": dict(profiles.get("safety", {})),
         "ui_devices": [],
         "all_devices": [],
+        "temperature_sensors": dict(temperature_sensors or {}),
+        "wizard_recommendations": list(wizard_recommendations or []),
     }
 
     if not isinstance(ui_devices, list) or not ui_devices:
@@ -94,10 +100,11 @@ def _merge_ui_devices_into_profiles(
             scheduled_hours = ["02:00", "03:00", "04:00"][:hours_needed]
 
         control_entity = (dev.get("control_entity_id") or "").strip()
+        has_control = bool(control_entity and dev.get("has_wifi_or_ha", True))
         enriched = {
             **dev,
-            "has_network_control": bool(control_entity),
-            "control_mode": "ha_entity" if control_entity else "manual_no_network",
+            "has_network_control": has_control,
+            "control_mode": "ha_entity" if has_control else "manual_no_network",
             "scheduled_hours": scheduled_hours,
         }
         merged["ui_devices"].append(enriched)
@@ -108,10 +115,30 @@ def _merge_ui_devices_into_profiles(
             merged["cars"].append(enriched)
         elif category == "heat_pump":
             merged["heat_pumps"].append(enriched)
-        elif category in ("heating_circuit", "water_heater", "sauna"):
+        elif category in ("heating_circuit", "floor_heating", "water_heater", "sauna"):
             merged["heating_circuits"].append(enriched)
 
     return merged
+
+
+def _read_sensor_group_average(hass, entity_ids: list | None) -> float | None:
+    """Lukee yhden tai useamman HA-lämpötila-anturin arvon ja palauttaa keskiarvon."""
+    if not isinstance(entity_ids, list) or not entity_ids:
+        return None
+    values: list[float] = []
+    for eid in entity_ids:
+        if not isinstance(eid, str) or not eid.strip():
+            continue
+        state_obj = hass.states.get(eid.strip())
+        if state_obj is None:
+            continue
+        try:
+            values.append(float(state_obj.state))
+        except (TypeError, ValueError):
+            continue
+    if not values:
+        return None
+    return round(sum(values) / len(values), 2)
 
 
 def _parse_dt(val) -> datetime | None:
@@ -275,6 +302,9 @@ def _analyze_local_price_series(
     profiles: dict,
     source_label: str,
     ui_devices: list | None = None,
+    temperature_sensors: dict | None = None,
+    wizard_recommendations: list[str] | None = None,
+    sensor_readings: dict | None = None,
 ) -> dict:
     """Laskee halvimmat tunnit, hintapiikit ja keskiarvot paikallisesta hintasarjasta."""
     now_local = dt_util.now()
@@ -288,7 +318,13 @@ def _analyze_local_price_series(
     if not upcoming:
         upcoming = entries
 
-    merged_profiles = _merge_ui_devices_into_profiles(profiles, ui_devices, upcoming)
+    merged_profiles = _merge_ui_devices_into_profiles(
+        profiles,
+        ui_devices,
+        upcoming,
+        temperature_sensors=temperature_sensors,
+        wizard_recommendations=wizard_recommendations,
+    )
 
     if upcoming:
         prices = [e["price"] for e in upcoming]
@@ -339,6 +375,7 @@ def _analyze_local_price_series(
             }
             for e in upcoming[:48]
         ],
+        "sensor_readings": dict(sensor_readings or {}),
         "device_profiles": merged_profiles,
     }
 
@@ -372,6 +409,10 @@ class AISahkovahtiDataCoordinator(DataUpdateCoordinator):
         self.hass = hass
         self.config_data = dict(config_data)
         self.ui_devices = list(self.config_data.get("ui_devices", []))
+        self.temperature_sensors = dict(self.config_data.get("temperature_sensors", {}))
+        self.wizard_recommendations = list(
+            self.config_data.get("wizard_recommendations", [])
+        )
         self.license_key = self.config_data.get("license_key", "FREE")
         self.tier = self.config_data.get("tier", "pro")
         self.area = self.config_data.get("area", "FI").upper()
@@ -398,10 +439,26 @@ class AISahkovahtiDataCoordinator(DataUpdateCoordinator):
             update_interval=SCAN_INTERVAL,
         )
 
+    def _collect_sensor_readings(self) -> dict:
+        """Lukee valittujen ylä-/alakerta-/ulkoantureiden keskiarvot."""
+        ts = self.temperature_sensors or {}
+        return {
+            "upstairs_avg_temp": _read_sensor_group_average(
+                self.hass, ts.get("upstairs_entities")
+            ),
+            "downstairs_avg_temp": _read_sensor_group_average(
+                self.hass, ts.get("downstairs_entities")
+            ),
+            "outdoor_temp": _read_sensor_group_average(
+                self.hass, ts.get("outdoor_entities")
+            ),
+        }
+
     async def _async_update_data(self):
         profiles = await self.hass.async_add_executor_job(
             _load_device_profiles, self.hass.config.config_dir
         )
+        sensor_readings = self._collect_sensor_readings()
 
         # 1. Paikallinen Home Assistant -hintasensori (Nord Pool / ENTSO-E / Tibber jne.)
         if self.price_source_mode == "ha_entity" and self.source_entity_id:
@@ -419,6 +476,9 @@ class AISahkovahtiDataCoordinator(DataUpdateCoordinator):
                     profiles=profiles,
                     source_label=f"ha_entity:{self.source_entity_id}",
                     ui_devices=self.ui_devices,
+                    temperature_sensors=self.temperature_sensors,
+                    wizard_recommendations=self.wizard_recommendations,
+                    sensor_readings=sensor_readings,
                 )
             _LOGGER.warning(
                 "Paikallinen hintasensori %s ei ole vielä valmis tai hintoja ei löytynyt",
@@ -464,6 +524,9 @@ class AISahkovahtiDataCoordinator(DataUpdateCoordinator):
                             profiles=profiles,
                             source_label="custom_api",
                             ui_devices=self.ui_devices,
+                            temperature_sensors=self.temperature_sensors,
+                            wizard_recommendations=self.wizard_recommendations,
+                            sensor_readings=sensor_readings,
                         )
             except Exception as err:
                 _LOGGER.warning("Oman API-osoitteen haku epäonnistui: %s", err)
@@ -499,13 +562,18 @@ class AISahkovahtiDataCoordinator(DataUpdateCoordinator):
                     data.setdefault("currency", self.currency)
                     data.setdefault("price_unit", self.price_unit)
                     data.setdefault("price_source", "server")
+                    data["sensor_readings"] = sensor_readings
                     hourly_for_sched = [
                         {"hour": h.get("hour"), "price": h.get("price")}
                         for h in data.get("hourly_prices", [])
                         if isinstance(h, dict) and h.get("price") is not None
                     ]
                     data["device_profiles"] = _merge_ui_devices_into_profiles(
-                        profiles, self.ui_devices, hourly_for_sched
+                        profiles,
+                        self.ui_devices,
+                        hourly_for_sched,
+                        temperature_sensors=self.temperature_sensors,
+                        wizard_recommendations=self.wizard_recommendations,
                     )
                     return data
         except Exception as error:
@@ -524,8 +592,13 @@ class AISahkovahtiDataCoordinator(DataUpdateCoordinator):
                 "spike_warning": False,
                 "min_water_temp_allowed": 55.0,
                 "legionella_status": "Turvallinen (Min. +55°C)",
+                "sensor_readings": sensor_readings,
                 "device_profiles": _merge_ui_devices_into_profiles(
-                    profiles, self.ui_devices, []
+                    profiles,
+                    self.ui_devices,
+                    [],
+                    temperature_sensors=self.temperature_sensors,
+                    wizard_recommendations=self.wizard_recommendations,
                 ),
             }
 
@@ -613,7 +686,7 @@ class AISahkovahtiLegionellaStatusSensor(CoordinatorEntity, SensorEntity):
 
 
 class AISahkovahtiDeviceProfilesSensor(CoordinatorEntity, SensorEntity):
-    """Altistaa käyttäjän laiteprofiilit, ryhmäkeskukset ja turvarajat Home Assistantille."""
+    """Altistaa käyttäjän laiteprofiilit, anturitiedot, suositukset, ryhmäkeskukset ja turvarajat."""
 
     def __init__(self, coordinator, entry_id: str):
         super().__init__(coordinator)
@@ -644,6 +717,9 @@ class AISahkovahtiDeviceProfilesSensor(CoordinatorEntity, SensorEntity):
             "currency": self.coordinator.data.get("currency", self.coordinator.currency),
             "ui_devices": profiles.get("ui_devices", []),
             "all_devices": profiles.get("all_devices", []),
+            "temperature_sensors": profiles.get("temperature_sensors", {}),
+            "sensor_readings": self.coordinator.data.get("sensor_readings", {}),
+            "wizard_recommendations": profiles.get("wizard_recommendations", []),
             "cars": profiles.get("cars", []),
             "heat_pumps": profiles.get("heat_pumps", []),
             "heating_circuits": profiles.get("heating_circuits", []),
