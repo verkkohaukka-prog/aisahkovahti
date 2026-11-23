@@ -1,3 +1,4 @@
+from urllib.parse import urlencode
 import voluptuous as vol
 import async_timeout
 from homeassistant import config_entries
@@ -209,6 +210,27 @@ def _normalize_and_validate_input(user_input: dict, fallback: dict | None = None
     return cleaned, errors
 
 
+async def _verify_license_on_server(hass, license_key: str) -> dict:
+    """Tarkistaa lisenssiavaimen voimassaolon ja maksullisen tason suoraan palvelimelta."""
+    query = urlencode({"key": license_key})
+    url = f"https://aisahkovahti.65.109.171.178.sslip.io/api/v1/verify?{query}"
+    session = async_get_clientsession(hass)
+    try:
+        async with async_timeout.timeout(10):
+            async with session.get(url) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if data.get("active", False):
+                        server_tier = str(data.get("tier", "pro")).lower()
+                        if server_tier not in ("pro", "vip"):
+                            server_tier = "pro"
+                        return {"active": True, "tier": server_tier}
+    except Exception:
+        pass
+
+    return {"active": False, "tier": None}
+
+
 class AISahkovahtiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """AI-Sähkövahdin asennusvelho (palvelinvarmennettu lisenssi + monimaa- ja valuuttatuki)."""
 
@@ -218,7 +240,7 @@ class AISahkovahtiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(config_entry):
         """Mahdollistaa lisenssiavaimen, maan, valuutan ja hintalähteen päivittämisen asetuksista."""
-        return AISahkovahtiOptionsFlowHandler(config_entry)
+        return AISahkovahtiOptionsFlowHandler()
 
     async def async_step_user(self, user_input=None):
         errors = {}
@@ -230,7 +252,7 @@ class AISahkovahtiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._abort_if_unique_id_configured()
 
             if not errors:
-                status = await self._verify_license(cleaned["license_key"])
+                status = await _verify_license_on_server(self.hass, cleaned["license_key"])
                 if status["active"]:
                     verified_tier = status["tier"]
                     cleaned["tier"] = verified_tier
@@ -238,8 +260,7 @@ class AISahkovahtiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         title=f"AI-Sähkövahti {cleaned['area']} [{cleaned['currency']}] ({verified_tier.upper()})",
                         data=cleaned,
                     )
-                else:
-                    errors["base"] = "invalid_license_key"
+                errors["base"] = "invalid_license_key"
 
         return self.async_show_form(
             step_id="user",
@@ -247,31 +268,9 @@ class AISahkovahtiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def _verify_license(self, license_key: str) -> dict:
-        """Tarkistaa lisenssiavaimen voimassaolon ja maksullisen tason suoraan palvelimelta."""
-        url = f"https://aisahkovahti.65.109.171.178.sslip.io/api/v1/verify?key={license_key}"
-        session = async_get_clientsession(self.hass)
-        try:
-            async with async_timeout.timeout(10):
-                async with session.get(url) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        if data.get("active", False):
-                            server_tier = str(data.get("tier", "pro")).lower()
-                            if server_tier not in ("pro", "vip"):
-                                server_tier = "pro"
-                            return {"active": True, "tier": server_tier}
-        except Exception:
-            pass
-
-        return {"active": False, "tier": None}
-
 
 class AISahkovahtiOptionsFlowHandler(config_entries.OptionsFlow):
     """Mahdollistaa lisenssiavaimen, hinta-alueen, valuutan ja oman hintalähteen muokkaamisen."""
-
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        self.config_entry = config_entry
 
     async def async_step_init(self, user_input=None):
         errors = {}
@@ -281,28 +280,9 @@ class AISahkovahtiOptionsFlowHandler(config_entries.OptionsFlow):
             cleaned, errors = _normalize_and_validate_input(user_input, fallback=current)
 
             if not errors:
-                url = f"https://aisahkovahti.65.109.171.178.sslip.io/api/v1/verify?key={cleaned['license_key']}"
-                session = async_get_clientsession(self.hass)
-                is_active = False
-                verified_tier = "pro"
-
-                try:
-                    async with async_timeout.timeout(10):
-                        async with session.get(url) as response:
-                            if response.status == 200:
-                                data = await response.json()
-                                if data.get("active", False):
-                                    is_active = True
-                                    server_tier = str(data.get("tier", "pro")).lower()
-                                    verified_tier = (
-                                        server_tier
-                                        if server_tier in ("pro", "vip")
-                                        else "pro"
-                                    )
-                except Exception:
-                    pass
-
-                if is_active:
+                status = await _verify_license_on_server(self.hass, cleaned["license_key"])
+                if status["active"]:
+                    verified_tier = status["tier"]
                     cleaned["tier"] = verified_tier
                     self.hass.config_entries.async_update_entry(
                         self.config_entry,
@@ -311,8 +291,7 @@ class AISahkovahtiOptionsFlowHandler(config_entries.OptionsFlow):
                     )
                     await self.hass.config_entries.async_reload(self.config_entry.entry_id)
                     return self.async_create_entry(title="", data={})
-                else:
-                    errors["base"] = "invalid_license_key"
+                errors["base"] = "invalid_license_key"
 
         return self.async_show_form(
             step_id="init",
