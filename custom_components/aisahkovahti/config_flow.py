@@ -816,7 +816,7 @@ class AISahkovahtiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     # -------------------------------------------------------------------------
-    # VAIHE 4: Sähköauto tai latausasema (Kyllä / Ei)
+    # VAIHE 4: Sähköauto tai latausasema (Kyllä / Ei + useampi auto mahdollinen)
     # -------------------------------------------------------------------------
     async def async_step_wiz_ev_yn(self, user_input=None):
         """Kysyy Kyllä/Ei: onko sähköauto tai latausasema."""
@@ -838,7 +838,7 @@ class AISahkovahtiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(step_id="wiz_ev_yn", data_schema=schema)
 
     async def async_step_wiz_ev_details(self, user_input=None):
-        """Sähköauton / laturin tiedot (helppo vaihtaa milloin vain Määritä-valikosta)."""
+        """Sähköauton / laturin tiedot (helppo vaihtaa ja lisätä useampia autoja)."""
         if user_input is not None:
             has_wifi = user_input.get("has_wifi_or_ha") == "yes"
             control_entity = (
@@ -860,6 +860,8 @@ class AISahkovahtiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "connection_mode": "ha_entity" if control_entity else "manual_offline",
                 }
             )
+            if user_input.get("add_another_ev") == "yes":
+                return await self.async_step_wiz_ev_details()
             return await self.async_step_wiz_other_yn()
 
         schema = vol.Schema(
@@ -905,6 +907,12 @@ class AISahkovahtiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     )
                 ),
                 vol.Optional("wifi_device_note", default=""): str,
+                vol.Required("add_another_ev", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
             }
         )
         return self.async_show_form(step_id="wiz_ev_details", data_schema=schema)
@@ -1438,6 +1446,8 @@ class AISahkovahtiOptionsFlowHandler(config_entries.OptionsFlow):
                     "connection_mode": "ha_entity" if control_entity else "manual_offline",
                 }
             )
+            if user_input.get("add_another_ev") == "yes":
+                return await self.async_step_wiz_ev_details()
             return await self.async_step_wiz_other_yn()
 
         schema = vol.Schema(
@@ -1483,6 +1493,12 @@ class AISahkovahtiOptionsFlowHandler(config_entries.OptionsFlow):
                     )
                 ),
                 vol.Optional("wifi_device_note", default=""): str,
+                vol.Required("add_another_ev", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
             }
         )
         return self.async_show_form(step_id="wiz_ev_details", data_schema=schema)
