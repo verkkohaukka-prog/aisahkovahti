@@ -9,7 +9,9 @@
 **AI-Sähkövahti** is a Home Assistant integration and automation package built around electricity spot-price markets, weather-aware price forecasting (24h, 7d, 30d), thermal mass pre-heating, and local load/fuse management.
 
 - **Live Dashboard & Free 24h Tier:** https://aisahkovahti.65.109.171.178.sslip.io *(Web UI currently in Finnish; English version coming soon)*
-- **Plans & Licensing:** Free 24h testing available via the site; **Pro** (7d) and **VIP** (30d) memberships are available via Gumroad (`https://hawknet.gumroad.com/`). License validation is performed via standard outbound HTTPS API requests.
+- **Plans & Licensing:** Free 24h testing available via the site; **Pro** (7d) and **VIP** (30d) memberships are available via Gumroad (`https://hawknet.gumroad.com/`). License validation is performed via standard outbound HTTPS API requests (`/api/v1/verify` and `/api/v1/forecast`).
+- **Plug & Play UI Device Management (No YAML Required):** Add, manage, or remove unlimited devices and heating zones directly from Home Assistant's UI (**Configure** menu) — including **offline / non-networked loads** (such as a water heater, upstairs/downstairs electric radiators, or sauna) by specifying only name, category, power (`kW`), panel group, and needed cheap hours, or by linking an existing Home Assistant entity (`switch`, `climate`, `water_heater`, `number`, `input_boolean`).
+- **Hassle-Free EV & Charger Swaps:** Switching electric vehicles or chargers no longer requires rebuilding automations. Add the new vehicle or charger in the UI (or as a manual load if its integration is not yet connected), remove the old one with one click, and keep your schedules and fuse protection intact.
 - **Local-First Security (Pull-Only):** No inbound ports or external access to your Home Assistant instance are required. The custom component only makes outbound HTTPS requests to fetch forecasts and validate license status; all heating decisions, safety limits, and relay actions run locally in Home Assistant.
 - **Thermal Mass, Zones & Price Caps (`packages/thermal_mass_learning.yaml`):**
   - Calculates heating demand hours using 24h outdoor temperature anchor points (`-30 °C` to `+15 °C`) blended with optional local outdoor and wind-chill sensors.
@@ -27,7 +29,7 @@
 
 A free 24-hour trial tier is available through the website, along with **Pro** and **VIP** memberships available on Gumroad: [https://hawknet.gumroad.com/](https://hawknet.gumroad.com/).
 
-- **Server-Verified Licensing:** Enter your personal license key during setup. The integration verifies subscription validity via an outbound HTTPS request and detects your tier (**Pro** or **VIP**) automatically. No open ports or inbound access to your Home Assistant instance are required.
+- **Server-Verified Licensing:** Enter your personal license key during setup. The integration verifies subscription validity via an outbound HTTPS request (`/api/v1/verify` and `/api/v1/forecast`) and detects your tier (**Pro** or **VIP**) automatically. No open ports or inbound access to your Home Assistant instance are required.
 - **Multi-Layered Safety Guardrails:** Includes built-in **Legionella safety monitoring** (min. +55 °C, overridable by the user when needed), main and sub-panel **fuse/power protection**, heat pump **COP low-temperature limits**, heating circuit **fault diagnostics**, home battery **UPS reserve protection**, post-vacation **return disinfection**, and **Advisory Approve-First** (`advisory_approve`) notifications.
 
 ---
@@ -91,13 +93,17 @@ homeassistant:
 2. Go to **Settings -> Devices & Services**.
 3. Click **Add Integration** in the bottom-right corner and search for **AI-Sähkövahti**.
 4. Enter your valid license key (or free 24h key), select your bidding area and currency, configure a local Home Assistant price sensor or custom API endpoint when outside `FI`, and let the integration detect your tier automatically.
+5. After setup, click **Configure** on the integration entry anytime to add or remove devices/zones (with or without network/entity control) or update general settings.
 
 ---
 
-## ⚙️ Device Profiles, Packages & Distribution Panels (`device_profiles/` & `packages/`)
+## ⚙️ UI Device Management, Profiles & Distribution Panels (`config_flow.py`, `device_profiles/` & `packages/`)
 
-You can tailor your property's equipment, control modes, schedules, overrides, and fuse limits by editing the YAML files under `/config/device_profiles/` and `/config/packages/`:
+You can add devices directly in the UI (**Configure -> Add controllable device or heating circuit**) or tailor YAML files under `/config/device_profiles/` and `/config/packages/` — both are merged automatically and receive calculated cheap hours (`scheduled_hours`):
 
+- **UI Device Management (`config_flow.py` & `sensor.py`):**
+  - **Works With or Without Network Connectivity:** Add offline or "dumb" loads such as a water heater, upstairs/downstairs radiators, or sauna using just a name, category (`water_heater`, `heating_circuit`, `heat_pump`, `ev_charger`, `sauna`, `other`), power (`kW`), panel group, and needed cheap hours (`1–24 h`), or optionally link a Home Assistant entity (`control_entity_id`).
+  - **Easy EV / Charger Replacement:** Add a new car or charger and remove the old one in the UI without rewriting automations; even without an active car integration yet, its `kW` load and schedule are included right away.
 - **`packages/thermal_mass_learning.yaml`**: Calculates 24h heating demand hours from outdoor temperature anchor points (`-30 °C` → `14 h`, `+15 °C` → `0 h`), local weather sensors (outdoor temperature and wind-chill factor), zone sensors (`p1`, `p2`, 1st/2nd floor vs. crawlspace/basement), and slab sensor depth (`none`, `deep_35_50mm`, `shallow_or_near_pipe`). Also includes price-cap modes (`cheapest_hours_only`, `max_price_cap`, `combined_cheapest_and_cap`), user-adjustable living-area drop limits, crawlspace frost/humidity alerts without forcing whole-house heating, and **Advisory Approve-First** (`advisory_approve`) notifications.
 - **`packages/aisahkovahti_profiles.yaml`**: Dynamic profiles, panel safety power limits, override switches, vacation/maintenance modes, and audit logging.
 - **`cars.yaml`**: EV and PHEV battery capacities (kWh), max currents (A), target state-of-charge (%), buffer reserves (`buffer_kwh`), and per-vehicle charging rules (`charging_rules`: cheap hours, price cap, schedules, and force override).
@@ -105,7 +111,7 @@ You can tailor your property's equipment, control modes, schedules, overrides, a
 - **`heating_circuits.yaml`**: Underfloor/ceiling heating circuits and electric radiator groups with rated power, fault anomaly monitoring, zone target temperatures (fixed or offset), schedules, and vacation settings.
 - **`safety.yaml`**: Main panel (e.g. 3x25A) and any separate sub-panels (such as a garage or yard panel) safety power limits (kW), override and schedule exceptions (`overrides_and_schedules`), and vacation maintenance and return disinfection rules (`vacation_and_hygiene`).
 
-After editing profile files, you can reload them without restarting Home Assistant by calling the `aisahkovahti.reload_profiles` service under Developer Tools.
+After editing profile files or updating UI devices, you can refresh device profiles without restarting Home Assistant by calling `aisahkovahti.reload_profiles` under Developer Tools.
 
 ---
 
@@ -158,7 +164,7 @@ Have questions, need help with setup, or want to discuss commercial collaboratio
 
 # ⚡ AI-Sähkövahti Home Assistant Integration (Pro & VIP)
 
-Tervetuloa AI-Sähkövahdin viralliseen Home Assistant -integraatiopakettiin! Tämä paketti mahdollistaa sähkömarkkinoiden älykkään ohjauksen, hintojen ennakoinnin (Pro 7 vrk / VIP 30 vrk), dynaamiset laiteprofiilit, joustavat aikataulu- ja ohitusvalinnat sekä pää- ja ryhmäkeskuskohtaisen kuormanhallinnan turvallisesti.
+Tervetuloa AI-Sähkövahdin viralliseen Home Assistant -integraatiopakettiin! Tämä paketti mahdollistaa sähkömarkkinoiden älykkään ohjauksen, hintojen ennakoinnin (Pro 7 vrk / VIP 30 vrk), graafisen laitehallinnan (myös ilman nettiyhteyttä toimiville laitteille), dynaamiset laiteprofiilit, joustavat aikataulu- ja ohitusvalinnat sekä pää- ja ryhmäkeskuskohtaisen kuormanhallinnan turvallisesti.
 
 ---
 
@@ -166,7 +172,7 @@ Tervetuloa AI-Sähkövahdin viralliseen Home Assistant -integraatiopakettiin! T�
 
 Paketin käyttöön on saatavilla ilmainen 24h kokeilutaso sivuston kautta sekä **Pro-** tai **VIP-jäsenyys** (hankittavissa Gumroadista: [https://hawknet.gumroad.com/](https://hawknet.gumroad.com/)).
 
-- **Palvelinvarmennettu lisenssi:** Asennuksen yhteydessä syötetään henkilökohtainen lisenssiavain. Palvelin tarkistaa tilauksen voimassaolon ulospäin suuntautuvalla HTTPS-pyynnöllä ja määrittää tilaustason (**Pro** tai **VIP**) automaattisesti. Avoin portteja tai ulkoista pääsyä käyttäjän Home Assistantiin ei tarvita.
+- **Palvelinvarmennettu lisenssi:** Asennuksen yhteydessä syötetään henkilökohtainen lisenssiavain. Palvelin tarkistaa tilauksen voimassaolon ulospäin suuntautuvalla HTTPS-pyynnöllä (`/api/v1/verify` ja `/api/v1/forecast`) ja määrittää tilaustason (**Pro** tai **VIP**) automaattisesti. Avoimia portteja tai ulkoista pääsyä käyttäjän Home Assistantiin ei tarvita.
 - **Monitasoinen turvakerros:** Paketti sisältää sisäänrakennetun **Legionella-turvavahdin** (min. +55 °C, tarvittaessa käyttäjän ohitettavissa), pää- ja ryhmäkeskuskohtaisen **sulakesuojan**, lämpöpumppujen **COP-pakkasrajan**, lämmityspiirien **vikadiagnostiikan**, kotiakuston **UPS-varavirtasuojan**, loman jälkeisen **paluudesinfioinnin** sekä **Ehdota → Hyväksy** (`advisory_approve`) -ilmoitusmahdollisuuden.
 
 ---
@@ -240,13 +246,17 @@ homeassistant:
 2. Mene kohtaan **Asetukset (Settings) -> Laitteet ja palvelut (Devices & Services)**.
 3. Klikkaa oikeasta alakulmasta **Lisää integraatio (Add Integration)** ja etsi listalta **AI-Sähkövahti**.
 4. Syötä voimassa oleva lisenssiavaimesi (tai ilmainen 24h-avain), valitse hinta-alue (`FI`, `SE3`, `NO1` jne.) ja valuutta sekä valitse tarvittaessa oma paikallinen Home Assistant -hintasensori tai oma API-osoite. Integraatio tunnistaa tilaustasosi automaattisesti.
+5. Kun integraatio on lisätty, voit milloin tahansa avata **Määritä (Configure)**-valikon ja lisätä tai poistaa ohjattavia laitteita/lämmityspiirejä (myös ilman nettiyhteyttä) tai muuttaa perusasetuksia.
 
 ---
 
-## ⚙️ Laiteprofiilit, Paketit ja Ryhmäkeskukset (`device_profiles/` & `packages/`)
+## ⚙️ Graafinen Laitehallinta, Profiilit ja Ryhmäkeskukset (`config_flow.py`, `device_profiles/` & `packages/`)
 
-Voit räätälöidä kiinteistösi laitteet, ohjaustavat, aikataulut, ohitukset ja sulakerajat muokkaamalla `/config/device_profiles/`- ja `/config/packages/`-kansioiden YAML-tiedostoja:
+Voit lisätä kohteita suoraan graafisesta valikosta (**Määritä -> Lisää ohjattava laite tai lämmityspiiri**) tai muokata YAML-tiedostoja `/config/device_profiles/`- ja `/config/packages/`-kansioissa — molemmat yhdistyvät automaattisesti samaan kokonaisuuteen ja saavat lasketut halvat tunnit (`scheduled_hours`):
 
+- **Graafinen laitehallinta ilman YAML-koodausta (`config_flow.py` & `sensor.py`):**
+  - **Toimii sekä älyreleillä että täysin ilman nettiyhteyttä:** Lisää verkkoon kytkemättömiä tai "tyhmiä" kohteita (esim. lämminvesivaraaja, yläkerran tai alakerran sähköpatterit, sauna) syöttämällä vain nimen, kategorian (`water_heater`, `heating_circuit`, `heat_pump`, `ev_charger`, `sauna`, `other`), tehon (`kW`), sulakeryhmän ja tarvittavat halvat tunnit (`1–24 h`), tai liitä halutessasi Home Assistant -ohjausentiteetti (`control_entity_id`).
+  - **Helppo auton tai laturin vaihto:** Vaihda sähköauto tai latausasema ilman automaatioiden purkamista — lisää uusi auto/laturi ja poista vanha listalta yhdellä klikkauksella. Vaikka uuden auton oma integraatio ei olisi vielä yhdistetty, sen teho (`kW`) ja latausaikataulu huomioidaan heti.
 - **`packages/thermal_mass_learning.yaml`**: Laskee 24 h lämmitystuntitarpeen ulkolämpötilan ankkuripisteistä (`-30 °C` → `14 h`, `+15 °C` → `0 h`), paikallisista sääantureista (ulkolämpötila ja tuulikerroin), vyöhykeantureista (`p1`, `p2`, 1./2. kerros vs. ryömintätila/kellari) ja laatta-anturin syvyydestä (`none`, `deep_35_50mm`, `shallow_or_near_pipe`). Sisältää myös hintakattotilat (`cheapest_hours_only`, `max_price_cap`, `combined_cheapest_and_cap`), käyttäjän säätämän asuintilan pudotusrajan, ryömintätilan pakkas-/kosteusilmoitukset ilman talon lämmityspakkoa sekä **Ehdota → Hyväksy** (`advisory_approve`) -ilmoitukset.
 - **`packages/aisahkovahti_profiles.yaml`**: Dynaamiset profiilit, keskusten turvatehorajat, ohituskytkimet, loma-/ylläpitotilat ja audit-loki.
 - **`cars.yaml`**: Sähköautojen ja lataushybridien akkukapasiteetit (kWh), maksimivirrat (A), tavoitevaraukset (%), varakapasiteetit (`buffer_kwh`) sekä autokohtaiset lataussäännöt (`charging_rules`: halvat tunnit, hintakatto, aikataulut ja pakko-ohitus).
@@ -254,7 +264,7 @@ Voit räätälöidä kiinteistösi laitteet, ohjaustavat, aikataulut, ohitukset 
 - **`heating_circuits.yaml`**: Lattia- ja kattolämmityspiirien sekä sähköpatteriryhmien nimellistehot, vikapoikkeamien valvonta, vyöhykekohtaiset tavoitelämpötilat (kiinteä tai offset), aikataulut ja loma-asetukset.
 - **`safety.yaml`**: Pääkeskuksen (esim. 3x25A) sekä mahdollisten erillisten ryhmäkeskusten (esim. autotalli tai pihakeskus) turvatehorajat (kW), ohitus- ja aikataulupoikkeukset (`overrides_and_schedules`) sekä loma-ajan ylläpito- ja paluudesinfiointisäännöt (`vacation_and_hygiene`).
 
-Kun muokkaat profiilitiedostoja, voit ladata ne käyttöön ilman Home Assistantin uudelleenkäynnistystä ajamalla kehittäjätyökaluista palvelun `aisahkovahti.reload_profiles`.
+Kun muokkaat profiilitiedostoja tai päivität laitteita, voit ladata ne käyttöön ilman Home Assistantin uudelleenkäynnistystä ajamalla kehittäjätyökaluista palvelun `aisahkovahti.reload_profiles`.
 
 ---
 
