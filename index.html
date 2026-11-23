@@ -4,18 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- google-site-verification: googlea456f8be205852f7.html -->
-    <title>AI-Sähkövahti — Smart Energy & Thermal Mass Control for Home Assistant</title>
+    <title>AI-Sähkövahti — Guided Yes/No Energy & Thermal Mass Control for Home Assistant</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-900 text-gray-100 font-sans antialiased">
 
     <!-- Top Language Bar -->
     <nav class="bg-gray-950 border-b border-gray-800 px-4 py-3">
-        <div class="max-w-6xl mx-auto flex justify-between items-center">
+        <div class="max-w-6xl mx-auto flex justify-between items-center gap-4">
             <span class="font-bold text-blue-400 tracking-wide">⚡ AI-Sähkövahti</span>
-            <div class="flex items-center gap-2">
-                <button id="btn-en" onclick="setLang('en')" class="px-3 py-1 rounded text-xs font-bold bg-blue-600 text-white transition">EN</button>
-                <button id="btn-fi" onclick="setLang('fi')" class="px-3 py-1 rounded text-xs font-bold bg-gray-800 text-gray-300 hover:bg-gray-700 transition">FI</button>
+            <div class="flex flex-wrap items-center gap-1.5">
+                <button id="btn-en" onclick="setLang('en')" class="px-2.5 py-1 rounded text-xs font-bold bg-blue-600 text-white transition">EN</button>
+                <button id="btn-fi" onclick="setLang('fi')" class="px-2.5 py-1 rounded text-xs font-bold bg-gray-800 text-gray-300 hover:bg-gray-700 transition">FI</button>
+                <button id="btn-sv" onclick="setLang('sv')" class="px-2.5 py-1 rounded text-xs font-bold bg-gray-800 text-gray-300 hover:bg-gray-700 transition">SV</button>
+                <button id="btn-fr" onclick="setLang('fr')" class="px-2.5 py-1 rounded text-xs font-bold bg-gray-800 text-gray-300 hover:bg-gray-700 transition">FR</button>
+                <button id="btn-es" onclick="setLang('es')" class="px-2.5 py-1 rounded text-xs font-bold bg-gray-800 text-gray-300 hover:bg-gray-700 transition">ES</button>
             </div>
         </div>
     </nav>
@@ -23,64 +26,189 @@
     <!-- Hero Section -->
     <header class="bg-gradient-to-r from-blue-900 to-indigo-900 py-20 px-4 text-center">
         <div class="max-w-4xl mx-auto">
-            <span data-en="Home Assistant Integration & Packages • Multi-Area Ready"
-                  data-fi="Home Assistant -integraatio & paketit • Monimaatuki"
+            <span data-en="Guided Yes/No Setup Wizard • Spot & Night Tariff • 5 Languages"
+                  data-fi="Kyllä/Ei-pika-asennusvelho • Pörssi- & Yösähkö • 5 Kieltä"
+                  data-sv="Guidad Ja/Nej-installation • Spot & Nattaxa • 5 Språk"
+                  data-fr="Assistant Oui/Non Guidé • Spot & Heures Creuses • 5 Langues"
+                  data-es="Asistente Sí/No Guiado • Tarifa Spot y Nocturna • 5 Idiomas"
                   class="lang-el bg-blue-600 text-xs font-semibold uppercase px-3 py-1 rounded-full tracking-wide">
-                  Home Assistant Integration & Packages • Multi-Area Ready
+                  Guided Yes/No Setup Wizard • Spot & Night Tariff • 5 Languages
             </span>
             <h1 class="text-4xl md:text-6xl font-extrabold mt-4 mb-6 tracking-tight">AI-Sähkövahti</h1>
-            <p data-en="Optimize electricity spot-price consumption, thermal mass pre-heating, water heaters, home batteries, and EV charging across the Nordics, Baltics, and Europe using your local Home Assistant price sensor or custom API."
-               data-fi="Optimoi kotisi sähkönkulutus, rakenteiden lämpömassan esilämmitys, lämminvesivaraaja, kotiakusto ja sähköauton lataus Pohjoismaissa, Baltiassa ja Euroopassa omalla HA-hintasensorilla tai API-osoitteella."
+            <p data-en="Configure temperature sensors, water heaters, floor heating with concrete & surface probes, EVs, heat pumps, and saunas via a simple Yes/No wizard—no YAML required, with spot, night-tariff, and fixed-price support."
+               data-fi="Määritä lämpötila-anturit, lämminvesivaraaja, lattialämmityksen betoni- ja pintatiedot, sähköautot, lämpöpumput ja saunan Kyllä/Ei-velholla ilman YAML-koodia — pörssi-, yö- ja kiinteähintaisille sopimuksille."
+               data-sv="Konfigurera temperatursensorer, varmvattenberedare, golvvärme med betong- och ytgivare, elbilar, värmepumpar och bastu via en enkel Ja/Nej-guide — utan YAML, med stöd för spot-, natt- och fastprisavtal."
+               data-fr="Configurez capteurs de température, chauffe-eau, plancher chauffant (dalle béton et surface), véhicules électriques, pompes à chaleur et sauna via un assistant Oui/Non sans YAML."
+               data-es="Configura sensores de temperatura, termo eléctrico, suelo radiante con sondas de hormigón y superficie, coches eléctricos, bombas de calor y sauna mediante un asistente Sí/No sin YAML."
                class="lang-el text-xl md:text-2xl text-gray-300 mb-8">
-               Optimize electricity spot-price consumption, thermal mass pre-heating, water heaters, home batteries, and EV charging across the Nordics, Baltics, and Europe using your local Home Assistant price sensor or custom API.
+               Configure temperature sensors, water heaters, floor heating with concrete & surface probes, EVs, heat pumps, and saunas via a simple Yes/No wizard—no YAML required, with spot, night-tariff, and fixed-price support.
             </p>
             
             <!-- Primary Buttons -->
             <div class="flex flex-wrap justify-center gap-4 mb-4">
-                <a href="#multi-area" data-en="Multi-Area & Local Sensors" data-fi="Monimaatuki & omat sensorit" class="lang-el bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3 rounded-lg shadow-lg transition">Multi-Area & Local Sensors</a>
-                <a href="#pricing" data-en="View Tiers (Free / Pro / VIP)" data-fi="Katso tasot (Ilmainen / Pro / VIP)" class="lang-el bg-gray-800 hover:bg-gray-700 text-white font-bold px-8 py-3 rounded-lg border border-gray-600 shadow-lg transition">View Tiers (Free / Pro / VIP)</a>
-                <a href="https://github.com/verkkohaukka-prog/aisahkovahti" target="_blank" data-en="GitHub Repository" data-fi="GitHub-repositorio" class="lang-el bg-gray-800 hover:bg-gray-700 text-white font-bold px-8 py-3 rounded-lg border border-gray-600 shadow-lg transition">GitHub Repository</a>
+                <a href="#wizard-guide"
+                   data-en="5-Step Yes/No Wizard"
+                   data-fi="5-vaiheinen Kyllä/Ei-velho"
+                   data-sv="5-stegs Ja/Nej-guide"
+                   data-fr="Assistant Oui/Non en 5 étapes"
+                   data-es="Asistente Sí/No en 5 pasos"
+                   class="lang-el bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3 rounded-lg shadow-lg transition">5-Step Yes/No Wizard</a>
+                <a href="#multi-area"
+                   data-en="Multi-Area & Local Sensors"
+                   data-fi="Monimaatuki & omat sensorit"
+                   data-sv="Flera områden & lokala sensorer"
+                   data-fr="Multi-zones & capteurs locaux"
+                   data-es="Multizona y sensores locales"
+                   class="lang-el bg-gray-800 hover:bg-gray-700 text-white font-bold px-8 py-3 rounded-lg border border-gray-600 shadow-lg transition">Multi-Area & Local Sensors</a>
+                <a href="#pricing"
+                   data-en="View Tiers (Free / Pro / VIP)"
+                   data-fi="Katso tasot (Ilmainen / Pro / VIP)"
+                   data-sv="Se nivåer (Gratis / Pro / VIP)"
+                   data-fr="Voir les offres (Gratuit / Pro / VIP)"
+                   data-es="Ver planes (Gratis / Pro / VIP)"
+                   class="lang-el bg-gray-800 hover:bg-gray-700 text-white font-bold px-8 py-3 rounded-lg border border-gray-600 shadow-lg transition">View Tiers (Free / Pro / VIP)</a>
+                <a href="https://github.com/verkkohaukka-prog/aisahkovahti" target="_blank"
+                   data-en="GitHub Repository"
+                   data-fi="GitHub-repositorio"
+                   data-sv="GitHub-förråd"
+                   data-fr="Dépôt GitHub"
+                   data-es="Repositorio GitHub"
+                   class="lang-el bg-gray-800 hover:bg-gray-700 text-white font-bold px-8 py-3 rounded-lg border border-gray-600 shadow-lg transition">GitHub Repository</a>
             </div>
 
             <!-- Secondary Links -->
             <div class="flex flex-wrap justify-center gap-3">
-                <a href="https://aisahkovahti.65.109.171.178.sslip.io/" target="_blank" data-en="🌐 Live Dashboard & Free 24h API" data-fi="🌐 Siirry PWA-sovellukseen (Ilmainen 24h)" class="lang-el bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-2 rounded-lg shadow transition text-sm">🌐 Live Dashboard & Free 24h API</a>
-                <a href="https://discord.gg/SnBhsXpAW7" target="_blank" data-en="💬 Join Discord" data-fi="💬 Liity Discordiin" class="lang-el bg-indigo-700 hover:bg-indigo-800 text-white font-semibold px-5 py-2 rounded-lg shadow transition text-sm">💬 Join Discord</a>
-                <a href="https://aisahkovahti.blogspot.com/" target="_blank" data-en="📖 Read Blog" data-fi="📖 Lue blogi" class="lang-el bg-gray-800 hover:bg-gray-700 text-gray-200 font-semibold px-5 py-2 rounded-lg border border-gray-700 transition text-sm">📖 Read Blog</a>
+                <a href="https://aisahkovahti.65.109.171.178.sslip.io/" target="_blank"
+                   data-en="🌐 Live Dashboard & Free 24h API"
+                   data-fi="🌐 Siirry PWA-sovellukseen (Ilmainen 24h)"
+                   data-sv="🌐 Live-panel & gratis 24h API"
+                   data-fr="🌐 Tableau de bord & API 24h gratuite"
+                   data-es="🌐 Panel en vivo y API 24h gratis"
+                   class="lang-el bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-2 rounded-lg shadow transition text-sm">🌐 Live Dashboard & Free 24h API</a>
+                <a href="https://discord.gg/SnBhsXpAW7" target="_blank"
+                   data-en="💬 Join Discord"
+                   data-fi="💬 Liity Discordiin"
+                   data-sv="💬 Gå med i Discord"
+                   data-fr="💬 Rejoindre Discord"
+                   data-es="💬 Unirse a Discord"
+                   class="lang-el bg-indigo-700 hover:bg-indigo-800 text-white font-semibold px-5 py-2 rounded-lg shadow transition text-sm">💬 Join Discord</a>
+                <a href="https://aisahkovahti.blogspot.com/" target="_blank"
+                   data-en="📖 Read Blog"
+                   data-fi="📖 Lue blogi"
+                   data-sv="📖 Läs bloggen"
+                   data-fr="📖 Lire le blog"
+                   data-es="📖 Leer el blog"
+                   class="lang-el bg-gray-800 hover:bg-gray-700 text-gray-200 font-semibold px-5 py-2 rounded-lg border border-gray-700 transition text-sm">📖 Read Blog</a>
             </div>
         </div>
     </header>
 
     <!-- Features -->
     <section class="py-16 px-4 max-w-6xl mx-auto">
-        <h2 data-en="Why AI-Sähkövahti?" data-fi="Miksi valita AI-Sähkövahti?" class="lang-el text-3xl font-bold text-center mb-12">Why AI-Sähkövahti?</h2>
+        <h2 data-en="Why AI-Sähkövahti?"
+            data-fi="Miksi valita AI-Sähkövahti?"
+            data-sv="Varför välja AI-Sähkövahti?"
+            data-fr="Pourquoi choisir AI-Sähkövahti ?"
+            data-es="¿Por qué elegir AI-Sähkövahti?"
+            class="lang-el text-3xl font-bold text-center mb-12">Why AI-Sähkövahti?</h2>
         <div class="grid md:grid-cols-3 gap-8">
             <div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
-                <div class="text-blue-400 text-3xl mb-4">🌍</div>
-                <h3 data-en="Multi-Area & Local Price Sources" data-fi="Monimaatuki & Omat Hintalähteet" class="lang-el text-xl font-semibold mb-2">Multi-Area & Local Price Sources</h3>
-                <p data-en="Supports FI, SE1–SE4, NO1–NO5, DK1–DK2, EE, LV, LT, GER/DE, AT, NL, BE, FR, PL, UK, CH, CZ, SK, HU, RO, ES, PT, IT and currencies (AUTO, EUR, SEK, NOK, DKK, PLN, GBP, CHF, CZK, HUF, RON) via your own HA sensor or custom API."
-                   data-fi="Tukee alueita FI, SE1–SE4, NO1–NO5, DK1–DK2, EE, LV, LT, GER/DE, AT, NL, BE, FR, PL, UK, CH, CZ, SK, HU, RO, ES, PT, IT ja valuuttoja (AUTO, EUR, SEK, NOK, DKK, PLN, GBP, CHF, CZK, HUF, RON) oman HA-sensorin tai API-osoitteen kautta."
+                <div class="text-blue-400 text-3xl mb-4">🧭</div>
+                <h3 data-en="Plug & Play Yes/No Wizard"
+                    data-fi="Kyllä/Ei-velho & Plug & Play -hallinta"
+                    data-sv="Ja/Nej-guide & Plug & Play-meny"
+                    data-fr="Assistant Oui/Non & Menu Plug & Play"
+                    data-es="Asistente Sí/No y Menú Plug & Play"
+                    class="lang-el text-xl font-semibold mb-2">Plug & Play Yes/No Wizard</h3>
+                <p data-en="Guided setup for upstairs/downstairs/outdoor sensors, water heaters, floor heating rooms, multiple EVs, heat pumps, and saunas—plus one-click EV replacement and offline/non-WiFi loads."
+                   data-fi="Opastettu käyttöönotto ylä-/alakerta-/ulkoantureille, varaajalle, lattialämmityshuoneille, useille sähköautoille, lämpöpumpuille ja saunalle — sekä auton vaihto yhdellä klikkauksella ja tuki verkkoyhteydettömille laitteille."
+                   data-sv="Guidad installation för övervåning/nedervåning/utomhus, varmvattenberedare, golvvärmerum, flera elbilar, värmepumpar och bastu — plus enkelt bilbyte och stöd för enheter utan WiFi."
+                   data-fr="Configuration guidée pour capteurs, chauffe-eau, plancher chauffant, plusieurs véhicules électriques, pompes à chaleur et sauna, avec remplacement de véhicule en un clic et gestion des charges sans WiFi."
+                   data-es="Configuración guiada para sensores, termo, suelo radiante, varios coches eléctricos, bombas de calor y sauna, con cambio de coche en un clic y soporte para cargas sin WiFi."
                    class="lang-el text-gray-400">
-                   Supports FI, SE1–SE4, NO1–NO5, DK1–DK2, EE, LV, LT, GER/DE, AT, NL, BE, FR, PL, UK, CH, CZ, SK, HU, RO, ES, PT, IT and currencies (AUTO, EUR, SEK, NOK, DKK, PLN, GBP, CHF, CZK, HUF, RON) via your own HA sensor or custom API.
+                   Guided setup for upstairs/downstairs/outdoor sensors, water heaters, floor heating rooms, multiple EVs, heat pumps, and saunas—plus one-click EV replacement and offline/non-WiFi loads.
+                </p>
+            </div>
+            <div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
+                <div class="text-blue-400 text-3xl mb-4">🌍</div>
+                <h3 data-en="Spot, Night Tariff & Multi-Area"
+                    data-fi="Pörssi-, Yö- & Kiinteä Sähkö + Monimaatuki"
+                    data-sv="Spot-, Natt- & Fastpris + Flera Områden"
+                    data-fr="Tarif Spot, Heures Creuses & Multi-Zones"
+                    data-es="Tarifa Spot, Nocturna y Multizona"
+                    class="lang-el text-xl font-semibold mb-2">Spot, Night Tariff & Multi-Area</h3>
+                <p data-en="Supports spot pricing, night/time-of-use tariffs (22:00–07:00 window), and fixed contracts across FI, SE1–SE4, NO1–NO5, DK1–DK2, Baltics, and Europe via your HA sensor or custom API."
+                   data-fi="Tukee pörssisähköä, yö-/kausisähköä (22:00–07:00) ja kiinteitä sopimuksia alueilla FI, SE1–SE4, NO1–NO5, DK1–DK2, Baltia ja Eurooppa oman HA-sensorin tai API-osoitteen kautta."
+                   data-sv="Stöder spotpris, nattaxa/tidstariff (22:00–07:00) och fasta avtal i FI, SE1–SE4, NO1–NO5, DK1–DK2, Baltikum och Europa via din HA-sensor eller eget API."
+                   data-fr="Prend en charge le tarif spot, les heures creuses (22h00–07h00) et les contrats fixes dans FI, SE1–SE4, NO1–NO5, DK1–DK2, les pays baltes et l'Europe via capteur HA ou API."
+                   data-es="Admite tarifa spot, nocturna (22:00–07:00) y contratos fijos en FI, SE1–SE4, NO1–NO5, DK1–DK2, países bálticos y Europa mediante sensor HA o API propia."
+                   class="lang-el text-gray-400">
+                   Supports spot pricing, night/time-of-use tariffs (22:00–07:00 window), and fixed contracts across FI, SE1–SE4, NO1–NO5, DK1–DK2, Baltics, and Europe via your HA sensor or custom API.
                 </p>
             </div>
             <div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
                 <div class="text-blue-400 text-3xl mb-4">🛡️</div>
-                <h3 data-en="100% Local & Zero Open Ports" data-fi="Paikallinen & Turvallinen" class="lang-el text-xl font-semibold mb-2">100% Local & Zero Open Ports</h3>
-                <p data-en="Outbound pull-only HTTPS requests only. Includes fuse protection, Legionella guard (+55 °C), user-defined drop limits, and approve-first notifications."
-                   data-fi="Vain ulospäin suuntautuvat HTTPS-haut ilman avoimia portteja. Sisältää sulakesuojan, Legionella-turvan (+55 °C) ja Ehdota → Hyväksy -tilan."
+                <h3 data-en="Safety, Slab Sensors & Blueprints"
+                    data-fi="Turvarajat, Laatta-anturit & Blueprintit"
+                    data-sv="Säkerhet, Golvgivare & Blueprints"
+                    data-fr="Sécurité, Sondes Dalle & Blueprints"
+                    data-es="Seguridad, Sondas de Losa y Blueprints"
+                    class="lang-el text-xl font-semibold mb-2">Safety, Slab Sensors & Blueprints</h3>
+                <p data-en="100% outbound-only HTTPS with no open ports. Includes Legionella protection (+55 °C), concrete slab vs. surface sensor guidance, fuse load reservation, and 5 Blueprints."
+                   data-fi="100 % paikallinen ja ulospäin suuntautuva HTTPS ilman avoimia portteja. Sisältää Legionella-turvan (+55 °C), betoni- ja pinta-anturisuositukset, tehonvarauksen ja 5 Blueprintiä."
+                   data-sv="100 % utgående HTTPS utan öppna portar. Inkluderar Legionella-skydd (+55 °C), vägledning för betong- och ytgivare, effekthantering och 5 Blueprints."
+                   data-fr="HTTPS sortant uniquement sans port ouvert. Inclut la protection légionelle (+55 °C), le choix sonde dalle/surface, la réservation de puissance et 5 Blueprints."
+                   data-es="HTTPS solo saliente sin puertos abiertos. Incluye protección antilegionela (+55 °C), guía de sonda en losa/superficie, reserva de potencia y 5 Blueprints."
                    class="lang-el text-gray-400">
-                   Outbound pull-only HTTPS requests only. Includes fuse protection, Legionella guard (+55 °C), user-defined drop limits, and approve-first notifications.
+                   100% outbound-only HTTPS with no open ports. Includes Legionella protection (+55 °C), concrete slab vs. surface sensor guidance, fuse load reservation, and 5 Blueprints.
                 </p>
             </div>
-            <div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
-                <div class="text-blue-400 text-3xl mb-4">🏗️</div>
-                <h3 data-en="Thermal Mass & Blueprints" data-fi="Lämpömassa & Blueprintit" class="lang-el text-xl font-semibold mb-2">Thermal Mass & Blueprints</h3>
-                <p data-en="Pre-heats concrete slabs and buffers using anchor-point temp scaling, multi-zone sensors, price caps, and 5 ready-to-use Blueprints."
-                   data-fi="Varaa betonilaattaa ja varaajaa ankkuripisteiden, vyöhykeantureiden, hintakaton ja 5 valmiin Blueprint-pohjan avulla."
-                   class="lang-el text-gray-400">
-                   Pre-heats concrete slabs and buffers using anchor-point temp scaling, multi-zone sensors, price caps, and 5 ready-to-use Blueprints.
-                </p>
+        </div>
+    </section>
+
+    <!-- 5-Step Guided Wizard Overview -->
+    <section id="wizard-guide" class="py-16 px-4 bg-gray-900 border-t border-gray-800">
+        <div class="max-w-6xl mx-auto">
+            <h2 data-en="How the 5-Step Yes/No Wizard Works"
+                data-fi="Näin 5-vaiheinen Kyllä/Ei-velho toimii"
+                data-sv="Så fungerar Ja/Nej-guiden i 5 steg"
+                data-fr="Comment fonctionne l'assistant Oui/Non en 5 étapes"
+                data-es="Cómo funciona el asistente Sí/No en 5 pasos"
+                class="lang-el text-3xl font-bold text-center mb-4">How the 5-Step Yes/No Wizard Works</h2>
+            <p data-en="Answer Yes or No step by step during initial setup or anytime later under Configure—no YAML editing needed."
+               data-fi="Vastaa Kyllä tai Ei vaihe vaiheelta asennuksessa tai milloin tahansa Määritä-valikossa — ilman YAML-tiedostojen muokkausta."
+               data-sv="Svara Ja eller Nej steg för steg vid installation eller när som helst under Anpassa — utan att redigera YAML."
+               data-fr="Répondez Oui ou Non étape par étape lors de l'installation ou dans Configurer — sans modifier de fichiers YAML."
+               data-es="Responde Sí o No paso a paso durante la configuración o en Configurar — sin editar archivos YAML."
+               class="lang-el text-gray-400 text-center max-w-3xl mx-auto mb-10">
+               Answer Yes or No step by step during initial setup or anytime later under Configure—no YAML editing needed.
+            </p>
+            <div class="grid md:grid-cols-5 gap-4">
+                <div class="bg-gray-800 p-5 rounded-xl border border-gray-700">
+                    <div class="text-blue-400 font-bold text-xs uppercase mb-1">1/5</div>
+                    <h3 class="font-semibold mb-2" data-en="Tariff & Sensors" data-fi="Sopimus & Anturit" data-sv="Tariff & Sensorer" data-fr="Tarif & Capteurs" data-es="Tarifa y Sensores">Tariff & Sensors</h3>
+                    <p class="text-gray-400 text-xs" data-en="Spot, night tariff, or fixed; upstairs, downstairs & outdoor HA entities or WiFi sensor names." data-fi="Pörssi-, yö- tai kiinteä sopimus; ylä-, alakerta- ja ulkoanturit tai WiFi-nimet." data-sv="Spot, nattaxa eller fast; över-/nedervåning & ute via HA eller WiFi-namn." data-fr="Spot, heures creuses ou fixe ; étages et extérieur via HA ou noms WiFi." data-es="Spot, nocturna o fija; plantas y exterior por HA o nombres WiFi.">Spot, night tariff, or fixed; upstairs, downstairs & outdoor HA entities or WiFi sensor names.</p>
+                </div>
+                <div class="bg-gray-800 p-5 rounded-xl border border-gray-700">
+                    <div class="text-blue-400 font-bold text-xs uppercase mb-1">2/5</div>
+                    <h3 class="font-semibold mb-2" data-en="Water Heater" data-fi="Varaaja" data-sv="Varmvatten" data-fr="Chauffe-eau" data-es="Termo">Water Heater</h3>
+                    <p class="text-gray-400 text-xs" data-en="Power (kW), cheapest hours, WiFi/contactor status, fuse group & +55 °C Legionella safety." data-fi="Teho (kW), halvimmat tunnit, WiFi/kontaktori, sulakeryhmä & +55 °C Legionella-turva." data-sv="Effekt (kW), billigaste timmar, WiFi/kontaktor, säkring & +55 °C Legionella-skydd." data-fr="Puissance (kW), heures creuses, WiFi/contacteur, disjoncteur et sécurité +55 °C." data-es="Potencia (kW), horas valle, WiFi/contactor, magnetotérmico y seguridad +55 °C.">Power (kW), cheapest hours, WiFi/contactor status, fuse group & +55 °C Legionella safety.</p>
+                </div>
+                <div class="bg-gray-800 p-5 rounded-xl border border-gray-700">
+                    <div class="text-blue-400 font-bold text-xs uppercase mb-1">3/5</div>
+                    <h3 class="font-semibold mb-2" data-en="Floor Heating" data-fi="Lattialämmitys" data-sv="Golvvärme" data-fr="Plancher Chauffant" data-es="Suelo Radiante">Floor Heating</h3>
+                    <p class="text-gray-400 text-xs" data-en="Single or multiple rooms in a loop, concrete slab sensor depth, and surface temperature sensors." data-fi="Yksi tai useampi huone silmukassa, betonianturin syvyys ja pintalämpötila-anturit." data-sv="Ett eller flera rum i slinga, betonggivarens djup och yttemperatursensorer." data-fr="Une ou plusieurs pièces en boucle, profondeur sonde béton et capteurs de surface." data-es="Una o varias habitaciones en bucle, profundidad de sonda en hormigón y sensores de superficie.">Single or multiple rooms in a loop, concrete slab sensor depth, and surface temperature sensors.</p>
+                </div>
+                <div class="bg-gray-800 p-5 rounded-xl border border-gray-700">
+                    <div class="text-blue-400 font-bold text-xs uppercase mb-1">4/5</div>
+                    <h3 class="font-semibold mb-2" data-en="Electric Vehicles" data-fi="Sähköautot" data-sv="Elbilar" data-fr="Véhicules Électriques" data-es="Coches Eléctricos">Electric Vehicles</h3>
+                    <p class="text-gray-400 text-xs" data-en="Add one or multiple EVs/chargers in a row and swap cars easily later." data-fi="Lisää yksi tai useampi auto/laturi peräkkäin ja vaihda auto myöhemmin helposti." data-sv="Lägg till en eller flera elbilar/laddboxar i rad och byt bil enkelt senare." data-fr="Ajoutez un ou plusieurs véhicules/bornes à la suite et changez facilement plus tard." data-es="Añade uno o varios coches/cargadores seguidos y cambia de coche fácilmente después.">Add one or multiple EVs/chargers in a row and swap cars easily later.</p>
+                </div>
+                <div class="bg-gray-800 p-5 rounded-xl border border-gray-700">
+                    <div class="text-blue-400 font-bold text-xs uppercase mb-1">5/5</div>
+                    <h3 class="font-semibold mb-2" data-en="Heat Pumps & Sauna" data-fi="Lämpöpumput & Sauna" data-sv="Värmepumpar & Bastu" data-fr="Pompes à Chaleur & Sauna" data-es="Bombas de Calor y Sauna">Heat Pumps & Sauna</h3>
+                    <p class="text-gray-400 text-xs" data-en="Add multiple heat pumps, electric radiators, or sauna loads in sequence." data-fi="Lisää useampi ilmalämpöpumppu, sähköpatteri tai sauna peräkkäin." data-sv="Lägg till flera värmepumpar, elradiatorer eller bastu i följd." data-fr="Ajoutez plusieurs pompes à chaleur, radiateurs électriques ou sauna à la suite." data-es="Añade varias bombas de calor, radiadores eléctricos o sauna de forma consecutiva.">Add multiple heat pumps, electric radiators, or sauna loads in sequence.</p>
+                </div>
             </div>
         </div>
     </section>
@@ -90,40 +218,55 @@
         <div class="max-w-5xl mx-auto">
             <h2 data-en="Multi-Area Setup with Local Sensors or Custom APIs"
                 data-fi="Monimaakäyttöönotto omalla HA-sensorilla tai API-osoitteella"
+                data-sv="Installation i flera områden med lokala sensorer eller eget API"
+                data-fr="Configuration multi-zones avec capteurs locaux ou API personnalisée"
+                data-es="Configuración multizona con sensores locales o API personalizada"
                 class="lang-el text-3xl font-bold text-center mb-4">
                 Multi-Area Setup with Local Sensors or Custom APIs
             </h2>
             <p data-en="Outside Finland (FI), users typically already have a local Home Assistant sensor (such as Nord Pool HACS, ENTSO-E HACS, Tibber, Octopus, or Awattar) or their own API endpoint."
                data-fi="Suomen (FI) ulkopuolella käyttäjillä on usein jo valmiina oma paikallinen Home Assistant -hintasensori (kuten Nord Pool HACS, ENTSO-E HACS, Tibber, Octopus tai Awattar) tai oma API-osoite."
+               data-sv="Utanför Finland (FI) har användare ofta redan en lokal Home Assistant-prissensor (som Nord Pool HACS, ENTSO-E HACS, Tibber, Octopus eller Awattar) eller en egen API-adress."
+               data-fr="Hors de la Finlande (FI), les utilisateurs disposent souvent déjà d'un capteur local Home Assistant (Nord Pool HACS, ENTSO-E HACS, Tibber, Octopus ou Awattar) ou de leur propre API."
+               data-es="Fuera de Finlandia (FI), los usuarios suelen contar ya con un sensor local en Home Assistant (Nord Pool HACS, ENTSO-E HACS, Tibber, Octopus o Awattar) o su propia API."
                class="lang-el text-gray-400 text-center max-w-3xl mx-auto mb-10">
                Outside Finland (FI), users typically already have a local Home Assistant sensor (such as Nord Pool HACS, ENTSO-E HACS, Tibber, Octopus, or Awattar) or their own API endpoint.
             </p>
 
             <div class="grid md:grid-cols-3 gap-6">
                 <div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
-                    <div class="text-blue-400 font-bold text-sm uppercase mb-2" data-en="Step 1" data-fi="Vaihe 1">Step 1</div>
-                    <h3 class="text-lg font-semibold mb-2" data-en="Select Area & Currency" data-fi="Valitse alue ja valuutta">Select Area & Currency</h3>
+                    <div class="text-blue-400 font-bold text-sm uppercase mb-2" data-en="Step 1" data-fi="Vaihe 1" data-sv="Steg 1" data-fr="Étape 1" data-es="Paso 1">Step 1</div>
+                    <h3 class="text-lg font-semibold mb-2" data-en="Select Area & Currency" data-fi="Valitse alue ja valuutta" data-sv="Välj område och valuta" data-fr="Choisir zone et devise" data-es="Elegir zona y moneda">Select Area & Currency</h3>
                     <p class="text-gray-400 text-sm"
                        data-en="Choose your bidding area (e.g. SE1–SE4, NO1–NO5, DK1–DK2, EE, LV, LT, GER/DE, AT, PL, UK) and currency (AUTO or EUR, SEK, NOK, DKK, PLN, GBP, CHF, CZK, HUF, RON)."
-                       data-fi="Valitse hinta-alueesi (esim. SE1–SE4, NO1–NO5, DK1–DK2, EE, LV, LT, GER/DE, AT, PL, UK) ja valuutta (AUTO tai EUR, SEK, NOK, DKK, PLN, GBP, CHF, CZK, HUF, RON).">
+                       data-fi="Valitse hinta-alueesi (esim. SE1–SE4, NO1–NO5, DK1–DK2, EE, LV, LT, GER/DE, AT, PL, UK) ja valuutta (AUTO tai EUR, SEK, NOK, DKK, PLN, GBP, CHF, CZK, HUF, RON)."
+                       data-sv="Välj elområde (t.ex. SE1–SE4, NO1–NO5, DK1–DK2, EE, LV, LT, GER/DE, AT, PL, UK) och valuta (AUTO eller EUR, SEK, NOK, DKK, PLN, GBP, CHF, CZK, HUF, RON)."
+                       data-fr="Choisissez votre zone (ex. SE1–SE4, NO1–NO5, DK1–DK2, EE, LV, LT, GER/DE, AT, PL, UK) et votre devise (AUTO ou EUR, SEK, NOK, DKK, PLN, GBP, CHF, CZK, HUF, RON)."
+                       data-es="Elige tu zona (ej. SE1–SE4, NO1–NO5, DK1–DK2, EE, LV, LT, GER/DE, AT, PL, UK) y moneda (AUTO o EUR, SEK, NOK, DKK, PLN, GBP, CHF, CZK, HUF, RON).">
                        Choose your bidding area (e.g. SE1–SE4, NO1–NO5, DK1–DK2, EE, LV, LT, GER/DE, AT, PL, UK) and currency (AUTO or EUR, SEK, NOK, DKK, PLN, GBP, CHF, CZK, HUF, RON).
                     </p>
                 </div>
                 <div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
-                    <div class="text-blue-400 font-bold text-sm uppercase mb-2" data-en="Step 2" data-fi="Vaihe 2">Step 2</div>
-                    <h3 class="text-lg font-semibold mb-2" data-en="Connect Local Sensor or API" data-fi="Kytke oma sensori tai API">Connect Local Sensor or API</h3>
+                    <div class="text-blue-400 font-bold text-sm uppercase mb-2" data-en="Step 2" data-fi="Vaihe 2" data-sv="Steg 2" data-fr="Étape 2" data-es="Paso 2">Step 2</div>
+                    <h3 class="text-lg font-semibold mb-2" data-en="Connect Local Sensor or API" data-fi="Kytke oma sensori tai API" data-sv="Anslut lokal sensor eller API" data-fr="Connecter capteur ou API" data-es="Conectar sensor o API">Connect Local Sensor or API</h3>
                     <p class="text-gray-400 text-sm"
                        data-en="Select your existing Home Assistant price sensor (ha_entity) to avoid rate limits and keep local taxes/tariffs, or enter a custom API URL (custom_api) with optional API key."
-                       data-fi="Valitse oma Home Assistant -hintasensorisi (ha_entity) välttääksesi rajapintarajoitukset ja säilyttääksesi paikalliset verot/marginaalit, tai anna oma API-osoite (custom_api) ja valinnainen avain.">
+                       data-fi="Valitse oma Home Assistant -hintasensorisi (ha_entity) välttääksesi rajapintarajoitukset ja säilyttääksesi paikalliset verot/marginaalit, tai anna oma API-osoite (custom_api) ja valinnainen avain."
+                       data-sv="Välj din befintliga Home Assistant-prissensor (ha_entity) för att undvika begränsningar och behålla lokala skatter/avgifter, eller ange ett eget API (custom_api)."
+                       data-fr="Sélectionnez votre capteur de prix Home Assistant (ha_entity) pour conserver vos taxes/tarifs locaux, ou saisissez une URL d'API personnalisée (custom_api)."
+                       data-es="Selecciona tu sensor de precios en Home Assistant (ha_entity) para mantener impuestos y tarifas locales, o introduce una URL de API personalizada (custom_api).">
                        Select your existing Home Assistant price sensor (ha_entity) to avoid rate limits and keep local taxes/tariffs, or enter a custom API URL (custom_api) with optional API key.
                     </p>
                 </div>
                 <div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
-                    <div class="text-blue-400 font-bold text-sm uppercase mb-2" data-en="Step 3" data-fi="Vaihe 3">Step 3</div>
-                    <h3 class="text-lg font-semibold mb-2" data-en="Match Unit & Multiplier" data-fi="Tarkista yksikkö ja kerroin">Match Unit & Multiplier</h3>
+                    <div class="text-blue-400 font-bold text-sm uppercase mb-2" data-en="Step 3" data-fi="Vaihe 3" data-sv="Steg 3" data-fr="Étape 3" data-es="Paso 3">Step 3</div>
+                    <h3 class="text-lg font-semibold mb-2" data-en="Match Unit & Multiplier" data-fi="Tarkista yksikkö ja kerroin" data-sv="Kontrollera enhet & multiplikator" data-fr="Vérifier unité et multiplicateur" data-es="Comprobar unidad y multiplicador">Match Unit & Multiplier</h3>
                     <p class="text-gray-400 text-sm"
                        data-en="Keep price_multiplier at 1.0 when your sensor already uses subunits (c/kWh, öre/kWh, øre/kWh, gr/kWh, p/kWh), or set e.g. 100.0 if converting major units per kWh."
-                       data-fi="Pidä price_multiplier arvossa 1.0, jos sensori käyttää jo alayksikköä (c/kWh, öre/kWh, øre/kWh, gr/kWh, p/kWh), tai aseta esim. 100.0 pääyksiköstä muunnettaessa.">
+                       data-fi="Pidä price_multiplier arvossa 1.0, jos sensori käyttää jo alayksikköä (c/kWh, öre/kWh, øre/kWh, gr/kWh, p/kWh), tai aseta esim. 100.0 pääyksiköstä muunnettaessa."
+                       data-sv="Behåll price_multiplier på 1.0 när sensorn redan använder underenheter (c/kWh, öre/kWh, øre/kWh, gr/kWh, p/kWh), eller ange t.ex. 100.0 vid omräkning."
+                       data-fr="Gardez price_multiplier à 1.0 si votre capteur utilise déjà les sous-unités (c/kWh, öre/kWh, øre/kWh, p/kWh), ou réglez par ex. 100.0 pour convertir."
+                       data-es="Mantén price_multiplier en 1.0 si tu sensor ya usa subunidades (c/kWh, öre/kWh, øre/kWh, p/kWh), o usa p. ej. 100.0 para convertir.">
                        Keep price_multiplier at 1.0 when your sensor already uses subunits (c/kWh, öre/kWh, øre/kWh, gr/kWh, p/kWh), or set e.g. 100.0 if converting major units per kWh.
                     </p>
                 </div>
@@ -134,9 +277,17 @@
     <!-- Pricing / Tiers -->
     <section id="pricing" class="py-16 px-4 bg-gray-800/50">
         <div class="max-w-6xl mx-auto text-center">
-            <h2 data-en="Choose Your Tier" data-fi="Valitse tarpeisiisi sopiva taso" class="lang-el text-3xl font-bold mb-4">Choose Your Tier</h2>
+            <h2 data-en="Choose Your Tier"
+                data-fi="Valitse tarpeisiisi sopiva taso"
+                data-sv="Välj din nivå"
+                data-fr="Choisissez votre offre"
+                data-es="Elige tu plan"
+                class="lang-el text-3xl font-bold mb-4">Choose Your Tier</h2>
             <p data-en="Start testing with the free 24-hour API tier or unlock 7-day and 30-day forecasts."
                data-fi="Aloita testaaminen ilmaisella 24 tunnin tasolla tai ota käyttöön 7 vrk ja 30 vrk ennusteet."
+               data-sv="Börja testa med den kostnadsfria 24-timmarsnivån eller lås upp 7- och 30-dagarsprognoser."
+               data-fr="Commencez avec l'offre gratuite 24h ou débloquez les prévisions sur 7 et 30 jours."
+               data-es="Empieza con el plan gratuito de 24h o desbloquea previsiones a 7 y 30 días."
                class="lang-el text-gray-400 mb-12">
                Start testing with the free 24-hour API tier or unlock 7-day and 30-day forecasts.
             </p>
@@ -145,61 +296,70 @@
                 <!-- Free Tier -->
                 <div class="bg-gray-800 p-8 rounded-2xl border border-gray-700 flex flex-col justify-between">
                     <div>
-                        <span data-en="Free Tier" data-fi="Ilmainen" class="lang-el text-emerald-400 font-semibold uppercase text-sm">Free Tier</span>
+                        <span data-en="Free Tier" data-fi="Ilmainen" data-sv="Gratisnivå" data-fr="Offre Gratuite" data-es="Plan Gratuito" class="lang-el text-emerald-400 font-semibold uppercase text-sm">Free Tier</span>
                         <h3 class="text-2xl font-bold mt-1 mb-2">AI-Sähkövahti 24h</h3>
-                        <p data-en="Test the Home Assistant sensors and local thermal mass package at zero cost."
-                           data-fi="Kokeile Home Assistant -sensoreita ja lämpömassapakettia maksutta."
+                        <p data-en="Test the guided setup wizard, sensors, and thermal mass package at zero cost."
+                           data-fi="Kokeile Kyllä/Ei-velhoa, antureita ja lämpömassapakettia maksutta."
+                           data-sv="Testa Ja/Nej-guiden, sensorer och värmelagringspaketet helt kostnadsfritt."
+                           data-fr="Testez l'assistant Oui/Non, les capteurs et l'inertie thermique gratuitement."
+                           data-es="Prueba el asistente Sí/No, sensores y masa térmica sin coste."
                            class="lang-el text-gray-400 mb-6">
-                           Test the Home Assistant sensors and local thermal mass package at zero cost.
+                           Test the guided setup wizard, sensors, and thermal mass package at zero cost.
                         </p>
                         <ul class="space-y-3 mb-8 text-gray-300 text-sm">
-                            <li data-en="✓ 24-hour spot price & weather forecast" data-fi="✓ 24 tunnin hinta- ja sääennuste" class="lang-el">✓ 24-hour spot price & weather forecast</li>
-                            <li data-en="✓ Full thermal_mass_learning.yaml package" data-fi="✓ Täysi thermal_mass_learning.yaml -paketti" class="lang-el">✓ Full thermal_mass_learning.yaml package</li>
-                            <li data-en="✓ 100% local execution, no open ports" data-fi="✓ 100 % paikallinen suoritus, ei avoimia portteja" class="lang-el">✓ 100% local execution, no open ports</li>
+                            <li data-en="✓ 24-hour spot price & weather forecast" data-fi="✓ 24 tunnin hinta- ja sääennuste" data-sv="✓ 24-timmars elpris- och väderprognos" data-fr="✓ Prévisions prix et météo sur 24h" data-es="✓ Previsión de precio y clima a 24h" class="lang-el">✓ 24-hour spot price & weather forecast</li>
+                            <li data-en="✓ Guided Yes/No wizard & thermal mass package" data-fi="✓ Kyllä/Ei-velho & lämpömassapaketti" data-sv="✓ Ja/Nej-guide & värmelagringspaket" data-fr="✓ Assistant Oui/Non & inertie thermique" data-es="✓ Asistente Sí/No y masa térmica" class="lang-el">✓ Guided Yes/No wizard & thermal mass package</li>
+                            <li data-en="✓ 100% local execution, no open ports" data-fi="✓ 100 % paikallinen suoritus, ei avoimia portteja" data-sv="✓ 100 % lokal körning, inga öppna portar" data-fr="✓ Exécution 100 % locale, sans port ouvert" data-es="✓ Ejecución 100 % local, sin puertos abiertos" class="lang-el">✓ 100% local execution, no open ports</li>
                         </ul>
                     </div>
-                    <a href="https://aisahkovahti.65.109.171.178.sslip.io/" target="_blank" data-en="Get Free 24h Access" data-fi="Aloita ilmaiseksi (24h)" class="lang-el block text-center bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg transition">Get Free 24h Access</a>
+                    <a href="https://aisahkovahti.65.109.171.178.sslip.io/" target="_blank" data-en="Get Free 24h Access" data-fi="Aloita ilmaiseksi (24h)" data-sv="Starta gratis (24h)" data-fr="Essai gratuit 24h" data-es="Empezar gratis (24h)" class="lang-el block text-center bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg transition">Get Free 24h Access</a>
                 </div>
 
                 <!-- Pro Tier -->
                 <div class="bg-gray-800 p-8 rounded-2xl border border-gray-700 flex flex-col justify-between">
                     <div>
-                        <span data-en="Popular" data-fi="Suosittu" class="lang-el text-blue-400 font-semibold uppercase text-sm">Popular</span>
+                        <span data-en="Popular" data-fi="Suosittu" data-sv="Populär" data-fr="Populaire" data-es="Popular" class="lang-el text-blue-400 font-semibold uppercase text-sm">Popular</span>
                         <h3 class="text-2xl font-bold mt-1 mb-2">AI-Sähkövahti Pro</h3>
-                        <p data-en="7-day forecast horizon and full device profile automation."
-                           data-fi="7 vuorokauden ennusteet ja täydet laiteprofiilit peruskotiin."
+                        <p data-en="7-day forecast horizon, multi-device wizard & Blueprints."
+                           data-fi="7 vuorokauden ennusteet, monilaitevelho ja Blueprintit."
+                           data-sv="7-dagarsprognos, guide för flera enheter & Blueprints."
+                           data-fr="Prévisions 7 jours, assistant multi-appareils et Blueprints."
+                           data-es="Previsión a 7 días, asistente multidispositivo y Blueprints."
                            class="lang-el text-gray-400 mb-6">
-                           7-day forecast horizon and full device profile automation.
+                           7-day forecast horizon, multi-device wizard & Blueprints.
                         </p>
                         <ul class="space-y-3 mb-8 text-gray-300 text-sm">
-                            <li data-en="✓ 7-day electricity price forecasts" data-fi="✓ 7 vuorokauden hintaennusteet" class="lang-el">✓ 7-day electricity price forecasts</li>
-                            <li data-en="✓ Ready-made Home Assistant Blueprints (5 pcs)" data-fi="✓ Valmiit Home Assistant Blueprintit (5 kpl)" class="lang-el">✓ Ready-made Home Assistant Blueprints (5 pcs)</li>
-                            <li data-en="✓ Water heater, EV & heating circuit control" data-fi="✓ Lämminvesivaraaja-, EV- & lämmitysohjaus" class="lang-el">✓ Water heater, EV & heating circuit control</li>
-                            <li data-en="✓ Community Discord access" data-fi="✓ Vapaaehtoinen Discord-yhteisö" class="lang-el">✓ Community Discord access</li>
+                            <li data-en="✓ 7-day electricity price forecasts" data-fi="✓ 7 vuorokauden hintaennusteet" data-sv="✓ 7-dagars elprisprognoser" data-fr="✓ Prévisions des prix sur 7 jours" data-es="✓ Previsiones de precios a 7 días" class="lang-el">✓ 7-day electricity price forecasts</li>
+                            <li data-en="✓ Ready-made Home Assistant Blueprints (5 pcs)" data-fi="✓ Valmiit Home Assistant Blueprintit (5 kpl)" data-sv="✓ Färdiga Home Assistant Blueprints (5 st)" data-fr="✓ Blueprints Home Assistant prêts à l'emploi (5)" data-es="✓ Blueprints de Home Assistant listos (5)" class="lang-el">✓ Ready-made Home Assistant Blueprints (5 pcs)</li>
+                            <li data-en="✓ Water heater, floor heating, EV & tariff support" data-fi="✓ Varaaja-, lattia-, EV- & sopimustyyppituki" data-sv="✓ Stöd för varmvatten, golvvärme, elbil & tariff" data-fr="✓ Chauffe-eau, plancher, VE et choix de tarif" data-es="✓ Termo, suelo radiante, VE y tipos de tarifa" class="lang-el">✓ Water heater, floor heating, EV & tariff support</li>
+                            <li data-en="✓ Community Discord access" data-fi="✓ Vapaaehtoinen Discord-yhteisö" data-sv="✓ Tillgång till Discord-community" data-fr="✓ Accès communauté Discord" data-es="✓ Acceso a la comunidad en Discord" class="lang-el">✓ Community Discord access</li>
                         </ul>
                     </div>
-                    <a href="https://hawknet.gumroad.com/" target="_blank" data-en="Get Pro Tier" data-fi="Hanki Pro-taso" class="lang-el block text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition">Get Pro Tier</a>
+                    <a href="https://hawknet.gumroad.com/" target="_blank" data-en="Get Pro Tier" data-fi="Hanki Pro-taso" data-sv="Skaffa Pro" data-fr="Obtenir Pro" data-es="Obtener Pro" class="lang-el block text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition">Get Pro Tier</a>
                 </div>
 
                 <!-- VIP Tier -->
                 <div class="bg-gray-800 p-8 rounded-2xl border border-blue-500 flex flex-col justify-between relative shadow-xl">
                     <div>
-                        <span data-en="Complete" data-fi="Laajin" class="lang-el bg-blue-500 text-white text-xs font-bold uppercase px-3 py-1 rounded-full">Complete</span>
+                        <span data-en="Complete" data-fi="Laajin" data-sv="Komplett" data-fr="Complet" data-es="Completo" class="lang-el bg-blue-500 text-white text-xs font-bold uppercase px-3 py-1 rounded-full">Complete</span>
                         <h3 class="text-2xl font-bold mt-1 mb-2">AI-Sähkövahti VIP</h3>
                         <p data-en="30-day long-range outlook for multi-day thermal storage & batteries."
                            data-fi="30 vuorokauden pitkän aikavälin ennusteet edistyneelle energianhallinnalle."
+                           data-sv="30-dagarsprognos för värmelagring över flera dagar & batterier."
+                           data-fr="Vision à 30 jours pour stockage thermique et batteries."
+                           data-es="Perspectiva a 30 días para acumulación térmica y baterías."
                            class="lang-el text-gray-400 mb-6">
                            30-day long-range outlook for multi-day thermal storage & batteries.
                         </p>
                         <ul class="space-y-3 mb-8 text-gray-300 text-sm">
-                            <li data-en="✓ 30-day long-range price trend forecasts" data-fi="✓ 30 vuorokauden pitkän aikavälin ennusteet" class="lang-el">✓ 30-day long-range price trend forecasts</li>
-                            <li data-en="✓ All Pro tier features included" data-fi="✓ Kaikki Pro-tason ominaisuudet" class="lang-el">✓ All Pro tier features included</li>
-                            <li data-en="✓ Home battery & solar excess optimization" data-fi="✓ Kotiakuston ja aurinkosähkön optimointi" class="lang-el">✓ Home battery & solar excess optimization</li>
-                            <li data-en="✓ Multi-day cold-snap thermal pre-heating" data-fi="✓ Ennakoiva rakenteiden esilämmitys pakkasjaksoille" class="lang-el">✓ Multi-day cold-snap thermal pre-heating</li>
-                            <li data-en="✓ Priority support & Discord community" data-fi="✓ Priorisoitu tuki & Discord-yhteisö" class="lang-el">✓ Priority support & Discord community</li>
+                            <li data-en="✓ 30-day long-range price trend forecasts" data-fi="✓ 30 vuorokauden pitkän aikavälin ennusteet" data-sv="✓ 30-dagars långsiktiga pristrender" data-fr="✓ Tendances de prix à 30 jours" data-es="✓ Tendencias de precios a 30 días" class="lang-el">✓ 30-day long-range price trend forecasts</li>
+                            <li data-en="✓ All Pro tier features included" data-fi="✓ Kaikki Pro-tason ominaisuudet" data-sv="✓ Alla Pro-funktioner inkluderade" data-fr="✓ Toutes les fonctions Pro incluses" data-es="✓ Todas las funciones Pro incluidas" class="lang-el">✓ All Pro tier features included</li>
+                            <li data-en="✓ Home battery & solar excess optimization" data-fi="✓ Kotiakuston ja aurinkosähkön optimointi" data-sv="✓ Optimering av hembatteri & solöverskott" data-fr="✓ Optimisation batterie domestique & surplus solaire" data-es="✓ Optimización de batería doméstica y excedente solar" class="lang-el">✓ Home battery & solar excess optimization</li>
+                            <li data-en="✓ Multi-day cold-snap thermal pre-heating" data-fi="✓ Ennakoiva rakenteiden esilämmitys pakkasjaksoille" data-sv="✓ Förtida uppvärmning inför köldknäppar" data-es="✓ Precalentamiento térmico ante olas de frío" class="lang-el">✓ Multi-day cold-snap thermal pre-heating</li>
+                            <li data-en="✓ Priority support & Discord community" data-fi="✓ Priorisoitu tuki & Discord-yhteisö" data-sv="✓ Prioriterad support & Discord-community" data-fr="✓ Support prioritaire & communauté Discord" data-es="✓ Soporte prioritario y comunidad en Discord" class="lang-el">✓ Priority support & Discord community</li>
                         </ul>
                     </div>
-                    <a href="https://hawknet.gumroad.com/" target="_blank" data-en="Get VIP Tier" data-fi="Hanki VIP-taso" class="lang-el block text-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition">Get VIP Tier</a>
+                    <a href="https://hawknet.gumroad.com/" target="_blank" data-en="Get VIP Tier" data-fi="Hanki VIP-taso" data-sv="Skaffa VIP" data-fr="Obtenir VIP" data-es="Obtener VIP" class="lang-el block text-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition">Get VIP Tier</a>
                 </div>
             </div>
         </div>
@@ -207,35 +367,41 @@
 
     <!-- Contact & Discord -->
     <section class="py-16 px-4 max-w-4xl mx-auto text-center">
-        <h2 data-en="Questions or Need Help?" data-fi="Kysyttävää tai tarvitsetko apua?" class="lang-el text-2xl font-bold mb-4">Questions or Need Help?</h2>
-        <p data-en="Get in touch via email or join the community on Discord!" data-fi="Ota yhteyttä sähköpostitse tai liity mukaan yhteisöön!" class="lang-el text-gray-400 mb-6">Get in touch via email or join the community on Discord!</p>
+        <h2 data-en="Questions or Need Help?" data-fi="Kysyttävää tai tarvitsetko apua?" data-sv="Frågor eller behov av hjälp?" data-fr="Des questions ou besoin d'aide ?" data-es="¿Preguntas o necesitas ayuda?" class="lang-el text-2xl font-bold mb-4">Questions or Need Help?</h2>
+        <p data-en="Get in touch via email or join the community on Discord!" data-fi="Ota yhteyttä sähköpostitse tai liity mukaan yhteisöön!" data-sv="Hör av dig via e-post eller gå med i communityn på Discord!" data-fr="Contactez-nous par e-mail ou rejoignez la communauté sur Discord !" data-es="¡Escríbenos por correo o únete a la comunidad en Discord!" class="lang-el text-gray-400 mb-6">Get in touch via email or join the community on Discord!</p>
         <div class="flex flex-wrap justify-center gap-6">
             <a href="mailto:verkkohaukka@gmail.com" class="text-blue-400 hover:underline">verkkohaukka@gmail.com</a>
-            <a href="https://discord.gg/SnBhsXpAW7" target="_blank" data-en="Discord Community (optional)" data-fi="Discord-yhteisö (vapaaehtoinen)" class="lang-el text-indigo-400 hover:underline">Discord Community (optional)</a>
+            <a href="https://discord.gg/SnBhsXpAW7" target="_blank" data-en="Discord Community (optional)" data-fi="Discord-yhteisö (vapaaehtoinen)" data-sv="Discord-community (valfritt)" data-fr="Communauté Discord (facultatif)" data-es="Comunidad en Discord (opcional)" class="lang-el text-indigo-400 hover:underline">Discord Community (optional)</a>
         </div>
     </section>
 
     <!-- Footer -->
     <footer class="bg-gray-950 py-8 text-center text-gray-500 text-sm">
-        <p data-en="© AI-Sähkövahti / VerkkoHaukka®. All rights reserved." data-fi="© AI-Sähkövahti / VerkkoHaukka®. Kaikki oikeudet pidätetään." class="lang-el">© AI-Sähkövahti / VerkkoHaukka®. All rights reserved.</p>
+        <p data-en="© AI-Sähkövahti / VerkkoHaukka®. All rights reserved."
+           data-fi="© AI-Sähkövahti / VerkkoHaukka®. Kaikki oikeudet pidätetään."
+           data-sv="© AI-Sähkövahti / VerkkoHaukka®. Alla rättigheter förbehållna."
+           data-fr="© AI-Sähkövahti / VerkkoHaukka®. Tous droits réservés."
+           data-es="© AI-Sähkövahti / VerkkoHaukka®. Todos los derechos reservados."
+           class="lang-el">© AI-Sähkövahti / VerkkoHaukka®. All rights reserved.</p>
     </footer>
 
     <script>
+        const langs = ['en', 'fi', 'sv', 'fr', 'es'];
         function setLang(lang) {
             document.documentElement.lang = lang;
             document.querySelectorAll('.lang-el').forEach(el => {
-                const text = el.getAttribute('data-' + lang);
+                const text = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
                 if (text) el.textContent = text;
             });
-            const btnEn = document.getElementById('btn-en');
-            const btnFi = document.getElementById('btn-fi');
-            if (lang === 'en') {
-                btnEn.className = 'px-3 py-1 rounded text-xs font-bold bg-blue-600 text-white transition';
-                btnFi.className = 'px-3 py-1 rounded text-xs font-bold bg-gray-800 text-gray-300 hover:bg-gray-700 transition';
-            } else {
-                btnFi.className = 'px-3 py-1 rounded text-xs font-bold bg-blue-600 text-white transition';
-                btnEn.className = 'px-3 py-1 rounded text-xs font-bold bg-gray-800 text-gray-300 hover:bg-gray-700 transition';
-            }
+            langs.forEach(code => {
+                const btn = document.getElementById('btn-' + code);
+                if (!btn) return;
+                if (code === lang) {
+                    btn.className = 'px-2.5 py-1 rounded text-xs font-bold bg-blue-600 text-white transition';
+                } else {
+                    btn.className = 'px-2.5 py-1 rounded text-xs font-bold bg-gray-800 text-gray-300 hover:bg-gray-700 transition';
+                }
+            });
         }
         setLang('en');
     </script>
