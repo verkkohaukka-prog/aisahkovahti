@@ -1,0 +1,292 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "AI-Sähkövahti — License & Price Area",
+        "description": "Enter your personal license key (Pro / VIP) or free 24h trial key. Next, the guided Yes/No wizard helps you configure temperature sensors, water heater, floor heating, EVs, and heat pumps without YAML coding.",
+        "data": {
+          "license_key": "License key",
+          "area": "Price area (e.g. FI, SE3, NO1, DE)",
+          "currency_choice": "Currency",
+          "price_source_mode": "Price source",
+          "source_entity_id": "Custom Home Assistant price sensor (optional for FI)",
+          "price_attribute": "Price attribute (default: auto)",
+          "price_multiplier": "Unit multiplier (default: 1.0)",
+          "custom_price_url": "Custom API URL (optional)",
+          "custom_api_key": "Custom API key (optional)"
+        }
+      },
+      "wiz_sensors_yn": {
+        "title": "Step 1/5 — Electricity Tariff & Temperature Sensors",
+        "description": "Select your electricity contract type (day/night tariff also supported) and answer Yes/No whether you have temperature sensors upstairs, downstairs, or outdoors. You can also answer No to all.",
+        "data": {
+          "tariff_type": "Electricity tariff type",
+          "has_upstairs_sensor": "Do you have an upstairs temperature sensor?",
+          "has_downstairs_sensor": "Do you have a downstairs temperature sensor?",
+          "has_outdoor_sensor": "Do you have an outdoor temperature sensor?"
+        }
+      },
+      "wiz_sensors_details": {
+        "title": "Step 1/5 — Select Sensors or Enter WiFi Sensor Name",
+        "description": "Select one or more Home Assistant sensors from the list AND/OR enter the WiFi sensor name (e.g. Shelly H&T Upstairs, RuuviTag Downstairs).",
+        "data": {
+          "upstairs_entities": "Upstairs sensors (multiple allowed)",
+          "upstairs_wifi_names": "Upstairs WiFi sensor name / identifier (optional)",
+          "downstairs_entities": "Downstairs sensors (multiple allowed)",
+          "downstairs_wifi_names": "Downstairs WiFi sensor name / identifier (optional)",
+          "outdoor_entities": "Outdoor temperature sensors",
+          "outdoor_wifi_names": "Outdoor WiFi sensor name / identifier (optional)"
+        }
+      },
+      "wiz_water_yn": {
+        "title": "Step 2/5 — Domestic Hot Water Heater",
+        "description": "Do you have an electric water heater? Note: Home Assistant cannot switch 230/400 V power without a smart relay or contactor — if your heater has no WiFi control yet, AI-Sähkövahti still reserves its load for fuse protection and provides a setup recommendation.",
+        "data": {
+          "has_water_heater": "Do you have a domestic hot water heater?"
+        }
+      },
+      "wiz_water_details": {
+        "title": "Step 2/5 — Water Heater Details",
+        "description": "Enter the heater name and power (kW). If the heater or its contactor does not yet have a WiFi relay (e.g. Shelly Pro 1PM), select 'No' for WiFi/HA connection.",
+        "data": {
+          "name": "Water heater name",
+          "has_wifi_or_ha": "Is the heater or its contactor connected to WiFi / HA?",
+          "power_kw": "Heater power (kW)",
+          "panel_group": "Fuse group / Distribution board",
+          "cheapest_hours_needed": "Cheapest hours needed per day (h)",
+          "control_entity_id": "HA control entity (if Yes)",
+          "wifi_device_note": "WiFi relay or contactor note (optional)"
+        }
+      },
+      "wiz_floor_yn": {
+        "title": "Step 3/5 — Electric Floor Heating",
+        "description": "Do you have electric floor heating? If Yes, you can configure one or multiple rooms along with concrete slab and surface temperature sensors.",
+        "data": {
+          "has_floor_heating": "Do you have electric floor heating?",
+          "floor_scope": "Is floor heating in a single room or multiple rooms?"
+        }
+      },
+      "wiz_floor_room": {
+        "title": "Step 3/5 — Floor Heating Room Details",
+        "description": "A concrete slab sensor enables heat-storing preheating during the cheapest night hours; a surface-only sensor uses shorter, steady heating cycles so the floor surface does not cool down too much.",
+        "data": {
+          "room_name": "Room or zone name (e.g. Bathroom, Downstairs)",
+          "power_kw": "Floor heating power (kW)",
+          "has_wifi_or_ha": "Is the room thermostat/relay connected to WiFi / HA?",
+          "has_concrete_sensor": "Does this room have a concrete slab sensor?",
+          "slab_sensor_depth": "Concrete sensor depth (if Yes)",
+          "has_surface_sensor": "Does this room have a surface / room air sensor?",
+          "floor_temp_entity_id": "Floor / room temperature sensor (optional)",
+          "control_entity_id": "HA control entity (optional)",
+          "panel_group": "Fuse group / Distribution board",
+          "add_another_room": "Add another floor heating room?"
+        }
+      },
+      "wiz_ev_yn": {
+        "title": "Step 4/5 — Electric Vehicle or Charger",
+        "description": "Do you have an electric vehicle or EV charger? You can add one or multiple vehicles and swap a vehicle later with one click without breaking automations.",
+        "data": {
+          "has_ev": "Do you have an electric vehicle or EV charger?"
+        }
+      },
+      "wiz_ev_details": {
+        "title": "Step 4/5 — EV / Charger Details",
+        "description": "Connect an HA control entity (e.g. Tesla, Easee, Zaptec) or add the vehicle as a manual load without network connection.",
+        "data": {
+          "name": "Vehicle or charger name",
+          "has_wifi_or_ha": "Is the vehicle or charger connected to WiFi / HA?",
+          "power_kw": "Charging power (kW)",
+          "panel_group": "Fuse group / Distribution board",
+          "cheapest_hours_needed": "Charging hours needed per day (h)",
+          "control_entity_id": "HA control entity (optional)",
+          "wifi_device_note": "Additional note (optional)",
+          "add_another_ev": "Add a second electric vehicle?"
+        }
+      },
+      "wiz_other_yn": {
+        "title": "Step 5/5 — Heat Pumps, Electric Radiators & Sauna",
+        "description": "Would you like to add air-to-water/air-source heat pumps (e.g. Mitsubishi, NIBE), upstairs/downstairs electric radiators, or a sauna stove?",
+        "data": {
+          "has_other_device": "Add a heat pump, electric radiators, or sauna?"
+        }
+      },
+      "wiz_other_details": {
+        "title": "Step 5/5 — Add Heating Device or Load",
+        "description": "You can add multiple devices in a row by selecting 'Yes' at the bottom.",
+        "data": {
+          "category": "Device type",
+          "name": "Device or room name",
+          "has_wifi_or_ha": "Is the device connected to WiFi / HA?",
+          "power_kw": "Power (kW)",
+          "panel_group": "Fuse group / Distribution board",
+          "cheapest_hours_needed": "Cheapest hours needed per day (h)",
+          "control_entity_id": "HA control entity (optional)",
+          "wifi_device_note": "Additional note (optional)",
+          "add_more_other": "Add another device or room?"
+        }
+      }
+    },
+    "error": {
+      "invalid_license_key": "License key is invalid or verification failed.",
+      "non_fi_requires_local_source": "Outside FI, please select a local HA price sensor or a custom API URL.",
+      "missing_source_entity": "Please select a Home Assistant price sensor.",
+      "missing_custom_url": "Please enter your custom API URL."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "AI-Sähkövahti — Plug & Play Control Menu",
+        "description": "Choose an action. Currently saved devices: {device_count}. Run the guided Yes/No wizard, add a single device, or swap an EV without editing YAML files.",
+        "data": {
+          "menu_action": "What would you like to do?"
+        }
+      },
+      "wiz_sensors_yn": {
+        "title": "Step 1/5 — Electricity Tariff & Temperature Sensors",
+        "description": "Select your electricity tariff type (including day/night tariff) and answer Yes/No for temperature sensors.",
+        "data": {
+          "tariff_type": "Electricity tariff type",
+          "has_upstairs_sensor": "Do you have an upstairs temperature sensor?",
+          "has_downstairs_sensor": "Do you have a downstairs temperature sensor?",
+          "has_outdoor_sensor": "Do you have an outdoor temperature sensor?"
+        }
+      },
+      "wiz_sensors_details": {
+        "title": "Step 1/5 — Select Sensors",
+        "description": "Select one or more sensors or enter a WiFi sensor name.",
+        "data": {
+          "upstairs_entities": "Upstairs sensors",
+          "upstairs_wifi_names": "Upstairs WiFi sensor name",
+          "downstairs_entities": "Downstairs sensors",
+          "downstairs_wifi_names": "Downstairs WiFi sensor name",
+          "outdoor_entities": "Outdoor sensors",
+          "outdoor_wifi_names": "Outdoor WiFi sensor name"
+        }
+      },
+      "wiz_water_yn": {
+        "title": "Step 2/5 — Domestic Hot Water Heater",
+        "description": "Do you have a domestic hot water heater?",
+        "data": {
+          "has_water_heater": "Do you have a domestic hot water heater?"
+        }
+      },
+      "wiz_water_details": {
+        "title": "Step 2/5 — Water Heater Details",
+        "description": "Enter heater power (kW) and whether the heater or contactor has WiFi control.",
+        "data": {
+          "name": "Heater name",
+          "has_wifi_or_ha": "Is the heater or contactor connected to WiFi / HA?",
+          "power_kw": "Heater power (kW)",
+          "panel_group": "Fuse group / Distribution board",
+          "cheapest_hours_needed": "Cheapest hours needed (h)",
+          "control_entity_id": "HA control entity",
+          "wifi_device_note": "Additional note"
+        }
+      },
+      "wiz_floor_yn": {
+        "title": "Step 3/5 — Electric Floor Heating",
+        "description": "Do you have electric floor heating?",
+        "data": {
+          "has_floor_heating": "Do you have electric floor heating?",
+          "floor_scope": "Single room or multiple rooms?"
+        }
+      },
+      "wiz_floor_room": {
+        "title": "Step 3/5 — Floor Heating Room Details",
+        "description": "Enter room name, power, and concrete slab / surface sensor details.",
+        "data": {
+          "room_name": "Room name",
+          "power_kw": "Power (kW)",
+          "has_wifi_or_ha": "Connected to WiFi / HA?",
+          "has_concrete_sensor": "Has concrete slab sensor?",
+          "slab_sensor_depth": "Concrete sensor depth",
+          "has_surface_sensor": "Has surface temperature sensor?",
+          "floor_temp_entity_id": "Temperature sensor",
+          "control_entity_id": "HA control entity",
+          "panel_group": "Fuse group",
+          "add_another_room": "Add next room?"
+        }
+      },
+      "wiz_ev_yn": {
+        "title": "Step 4/5 — Electric Vehicle or Charger",
+        "description": "Do you have an electric vehicle or charger?",
+        "data": {
+          "has_ev": "Do you have an electric vehicle or charger?"
+        }
+      },
+      "wiz_ev_details": {
+        "title": "Step 4/5 — EV Details",
+        "description": "You can add multiple vehicles in a row.",
+        "data": {
+          "name": "Vehicle name",
+          "has_wifi_or_ha": "Connected to WiFi / HA?",
+          "power_kw": "Charging power (kW)",
+          "panel_group": "Fuse group",
+          "cheapest_hours_needed": "Hours needed (h)",
+          "control_entity_id": "HA control entity",
+          "wifi_device_note": "Additional note",
+          "add_another_ev": "Add a second electric vehicle?"
+        }
+      },
+      "wiz_other_yn": {
+        "title": "Step 5/5 — Other Devices (Heat Pumps, Radiators, Sauna)",
+        "description": "Add a heat pump, electric radiators, or sauna?",
+        "data": {
+          "has_other_device": "Add another device?"
+        }
+      },
+      "wiz_other_details": {
+        "title": "Step 5/5 — Device Details",
+        "description": "You can add multiple devices in a row.",
+        "data": {
+          "category": "Device type",
+          "name": "Name",
+          "has_wifi_or_ha": "Connected to WiFi / HA?",
+          "power_kw": "Power (kW)",
+          "panel_group": "Fuse group",
+          "cheapest_hours_needed": "Hours needed (h)",
+          "control_entity_id": "HA control entity",
+          "wifi_device_note": "Additional note",
+          "add_more_other": "Add another device?"
+        }
+      },
+      "add_device": {
+        "title": "Add Single Device or Room",
+        "description": "Works completely offline too — just enter name, category, and power (kW).",
+        "data": {
+          "name": "Device or room name",
+          "category": "Device type",
+          "has_wifi_or_ha": "Connected to WiFi / HA?",
+          "power_kw": "Power (kW)",
+          "panel_group": "Fuse group",
+          "cheapest_hours_needed": "Cheapest hours needed (h)",
+          "control_entity_id": "HA control entity (optional)",
+          "wifi_device_note": "Additional note (optional)"
+        }
+      },
+      "manage_devices": {
+        "title": "Manage or Remove Devices",
+        "description": "Select devices to remove (e.g. an old EV when replacing your car).",
+        "data": {
+          "remove_ids": "Devices to remove"
+        }
+      },
+      "general_settings": {
+        "title": "General Settings",
+        "description": "Edit license key, price area, currency, or price source.",
+        "data": {
+          "license_key": "License key",
+          "area": "Price area",
+          "currency_choice": "Currency",
+          "price_source_mode": "Price source",
+          "source_entity_id": "HA price sensor",
+          "price_attribute": "Price attribute",
+          "price_multiplier": "Unit multiplier",
+          "custom_price_url": "Custom API URL",
+          "custom_api_key": "Custom API key"
+        }
+      }
+    }
+  }
+}
