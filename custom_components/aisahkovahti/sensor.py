@@ -1,6 +1,7 @@
 import os
 import logging
 from datetime import datetime, timedelta
+from urllib.parse import quote
 import yaml
 import async_timeout
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
@@ -59,7 +60,11 @@ def _load_device_profiles(config_dir: str) -> dict:
 def _parse_dt(val) -> datetime | None:
     """Muuntaa ISO-aikaleiman tai datetime-olion aikavyöhykkeelliseksi datetimeksi."""
     if isinstance(val, datetime):
-        return dt_util.as_local(val) if val.tzinfo else dt_util.as_local(val.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE))
+        return (
+            dt_util.as_local(val)
+            if val.tzinfo
+            else dt_util.as_local(val.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE))
+        )
     if isinstance(val, str):
         parsed = dt_util.parse_datetime(val)
         if parsed is not None:
@@ -67,7 +72,9 @@ def _parse_dt(val) -> datetime | None:
     return None
 
 
-def _extract_entries_from_list(items, multiplier: float, base_date: datetime | None = None) -> list[dict]:
+def _extract_entries_from_list(
+    items, multiplier: float, base_date: datetime | None = None
+) -> list[dict]:
     """Muuntaa eri integraatioiden (Nord Pool, ENTSO-E, Tibber, custom JSON) hintalistat yhtenäiseen muotoon."""
     extracted = []
     if not isinstance(items, list):
@@ -78,7 +85,15 @@ def _extract_entries_from_list(items, multiplier: float, base_date: datetime | N
         raw_val = None
 
         if isinstance(item, dict):
-            for time_key in ("start", "start_time", "time", "datetime", "startsAt", "from", "timestamp"):
+            for time_key in (
+                "start",
+                "start_time",
+                "time",
+                "datetime",
+                "startsAt",
+                "from",
+                "timestamp",
+            ):
                 if time_key in item and item[time_key] is not None:
                     start_dt = _parse_dt(item[time_key])
                     if start_dt:
@@ -92,7 +107,9 @@ def _extract_entries_from_list(items, multiplier: float, base_date: datetime | N
                         pass
         elif isinstance(item, (int, float)) and base_date is not None:
             raw_val = float(item)
-            start_dt = base_date.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=idx)
+            start_dt = base_date.replace(
+                hour=0, minute=0, second=0, microsecond=0
+            ) + timedelta(hours=idx)
 
         if start_dt is not None and raw_val is not None:
             extracted.append(
@@ -106,7 +123,9 @@ def _extract_entries_from_list(items, multiplier: float, base_date: datetime | N
     return extracted
 
 
-def _parse_ha_entity_prices(state_obj, price_attribute: str, multiplier: float) -> tuple[float | None, list[dict]]:
+def _parse_ha_entity_prices(
+    state_obj, price_attribute: str, multiplier: float
+) -> tuple[float | None, list[dict]]:
     """Lukee hinnat käyttäjän omasta Home Assistant -sensorista (Nord Pool / ENTSO-E / Tibber / mukautettu)."""
     if state_obj is None:
         return None, []
@@ -131,22 +150,48 @@ def _parse_ha_entity_prices(state_obj, price_attribute: str, multiplier: float) 
     else:
         # 1. Nord Pool (HACS): raw_today + raw_tomorrow (tai today + tomorrow)
         if "raw_today" in attrs:
-            entries.extend(_extract_entries_from_list(attrs.get("raw_today"), multiplier, today_start))
-            entries.extend(_extract_entries_from_list(attrs.get("raw_tomorrow"), multiplier, tomorrow_start))
+            entries.extend(
+                _extract_entries_from_list(attrs.get("raw_today"), multiplier, today_start)
+            )
+            entries.extend(
+                _extract_entries_from_list(
+                    attrs.get("raw_tomorrow"), multiplier, tomorrow_start
+                )
+            )
         # 2. ENTSO-E (HACS): prices / prices_today + prices_tomorrow
         elif "prices_today" in attrs or "prices_tomorrow" in attrs:
-            entries.extend(_extract_entries_from_list(attrs.get("prices_today"), multiplier, today_start))
-            entries.extend(_extract_entries_from_list(attrs.get("prices_tomorrow"), multiplier, tomorrow_start))
+            entries.extend(
+                _extract_entries_from_list(
+                    attrs.get("prices_today"), multiplier, today_start
+                )
+            )
+            entries.extend(
+                _extract_entries_from_list(
+                    attrs.get("prices_tomorrow"), multiplier, tomorrow_start
+                )
+            )
         elif "prices" in attrs:
-            entries.extend(_extract_entries_from_list(attrs.get("prices"), multiplier, today_start))
+            entries.extend(
+                _extract_entries_from_list(attrs.get("prices"), multiplier, today_start)
+            )
         # 3. Tibber / Octopus / muut: today + tomorrow / data / hourly_prices
         elif "today" in attrs:
-            entries.extend(_extract_entries_from_list(attrs.get("today"), multiplier, today_start))
-            entries.extend(_extract_entries_from_list(attrs.get("tomorrow"), multiplier, tomorrow_start))
+            entries.extend(
+                _extract_entries_from_list(attrs.get("today"), multiplier, today_start)
+            )
+            entries.extend(
+                _extract_entries_from_list(
+                    attrs.get("tomorrow"), multiplier, tomorrow_start
+                )
+            )
         else:
             for fallback_key in ("hourly_prices", "data", "forecast", "intervals"):
                 if fallback_key in attrs:
-                    entries.extend(_extract_entries_from_list(attrs.get(fallback_key), multiplier, today_start))
+                    entries.extend(
+                        _extract_entries_from_list(
+                            attrs.get(fallback_key), multiplier, today_start
+                        )
+                    )
                     break
 
     # Järjestetään ja poistetaan duplikaatit aikaleiman mukaan
@@ -178,7 +223,9 @@ def _analyze_local_price_series(
     horizon_end = now_local + timedelta(hours=24)
 
     upcoming = [
-        e for e in entries if (now_local - timedelta(minutes=59)) <= e["start"] <= horizon_end
+        e
+        for e in entries
+        if (now_local - timedelta(minutes=59)) <= e["start"] <= horizon_end
     ]
     if not upcoming:
         upcoming = entries
@@ -194,9 +241,15 @@ def _analyze_local_price_series(
         cheapest_3_chrono = sorted(cheapest_3, key=lambda x: x["start"])
         best_hours = [e["hour_label"] for e in cheapest_3_chrono]
 
-        active_price = current_price if current_price is not None else upcoming[0]["price"]
+        active_price = (
+            current_price if current_price is not None else upcoming[0]["price"]
+        )
         # Hintapiikki: hinta on yli 1.6x keskihinnan ja selvästi yli nollatason
-        spike_warning = bool(avg_price > 0 and active_price >= avg_price * 1.6 and (active_price - avg_price) > 2.0)
+        spike_warning = bool(
+            avg_price > 0
+            and active_price >= avg_price * 1.6
+            and (active_price - avg_price) > 2.0
+        )
     else:
         active_price = current_price
         avg_price = current_price
@@ -219,7 +272,11 @@ def _analyze_local_price_series(
         "min_water_temp_allowed": 55.0,
         "legionella_status": "Turvallinen (Min. +55°C)",
         "hourly_prices": [
-            {"start": e["start"].isoformat(), "hour": e["hour_label"], "price": e["price"]}
+            {
+                "start": e["start"].isoformat(),
+                "hour": e["hour_label"],
+                "price": e["price"],
+            }
             for e in upcoming[:48]
         ],
         "device_profiles": profiles,
@@ -258,7 +315,9 @@ class AISahkovahtiDataCoordinator(DataUpdateCoordinator):
         self.tier = self.config_data.get("tier", "pro")
         self.area = self.config_data.get("area", "FI").upper()
         currency_choice = self.config_data.get("currency_choice", "AUTO")
-        resolved_currency, resolved_unit = resolve_currency_and_unit(self.area, currency_choice)
+        resolved_currency, resolved_unit = resolve_currency_and_unit(
+            self.area, currency_choice
+        )
         self.currency = self.config_data.get("currency", resolved_currency)
         self.price_unit = self.config_data.get("price_unit", resolved_unit)
         self.price_source_mode = self.config_data.get(
@@ -306,10 +365,8 @@ class AISahkovahtiDataCoordinator(DataUpdateCoordinator):
 
         # 2. Käyttäjän oma API-osoite (tukee {area}- ja {currency}-paikkamerkkejä)
         if self.price_source_mode == "custom_api" and self.custom_price_url:
-            custom_url = (
-                self.custom_price_url
-                .replace("{area}", self.area)
-                .replace("{currency}", self.currency)
+            custom_url = self.custom_price_url.replace("{area}", self.area).replace(
+                "{currency}", self.currency
             )
             headers = {"Accept": "application/json"}
             if self.custom_api_key:
@@ -351,13 +408,22 @@ class AISahkovahtiDataCoordinator(DataUpdateCoordinator):
         # 3. AI-Sähkövahti palvelinrajapinta (oletus FI)
         url = (
             f"https://aisahkovahti.65.109.171.178.sslip.io/api/v1/forecast"
-            f"?key={self.license_key}&tier={self.tier}&area={self.area}¤cy={self.currency}"
+            f"?key={quote(str(self.license_key))}"
+            f"&tier={quote(str(self.tier))}"
+            f"&area={quote(str(self.area))}"
+            f"¤cy={quote(str(self.currency))}"
         )
         session = async_get_clientsession(self.hass)
 
         try:
             async with async_timeout.timeout(15):
                 async with session.get(url) as response:
+                    if response.status in (401, 403):
+                        _LOGGER.warning(
+                            "Lisenssitarkistus estetty tai vanhentunut (HTTP %s) alueelle %s",
+                            response.status,
+                            self.area,
+                        )
                     if response.status != 200:
                         raise UpdateFailed(
                             f"Palvelin vastasi virhekoodilla: {response.status}"
@@ -426,7 +492,9 @@ class AISahkovahtiCurrentPriceSensor(CoordinatorEntity, SensorEntity):
 class AISahkovahtiBestChargingSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, entry_id: str):
         super().__init__(coordinator)
-        self._attr_name = f"AI-Sähkövahti Optimaaliset Lataustunnit ({coordinator.area})"
+        self._attr_name = (
+            f"AI-Sähkövahti Optimaaliset Lataustunnit ({coordinator.area})"
+        )
         self._attr_unique_id = f"aisahkovahti_{entry_id}_best_hours"
         self._attr_icon = "mdi:clock-check-outline"
 
@@ -475,7 +543,9 @@ class AISahkovahtiDeviceProfilesSensor(CoordinatorEntity, SensorEntity):
 
     def __init__(self, coordinator, entry_id: str):
         super().__init__(coordinator)
-        self._attr_name = f"AI-Sähkövahti Laitteistoprofiilit & Turvarajat ({coordinator.area})"
+        self._attr_name = (
+            f"AI-Sähkövahti Laitteistoprofiilit & Turvarajat ({coordinator.area})"
+        )
         self._attr_unique_id = f"aisahkovahti_{entry_id}_device_profiles"
         self._attr_icon = "mdi:home-lightning-bolt"
 
