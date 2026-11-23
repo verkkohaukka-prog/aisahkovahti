@@ -14,6 +14,21 @@ YES_NO_OPTIONS = [
     {"value": "no", "label": "Ei"},
 ]
 
+TARIFF_TYPE_OPTIONS = [
+    {
+        "value": "spot",
+        "label": "Pörssisähkö (tuntihinta — poimii vuorokauden halvimmat tunnit)",
+    },
+    {
+        "value": "night_tariff",
+        "label": "Yösähkö / Kausisähkö (halvempi yösähkö 22:00–07:00, usein vanha kontaktori)",
+    },
+    {
+        "value": "fixed",
+        "label": "Kiinteähintainen sopimus (pääsulakesuoja & kuormien porrastus)",
+    },
+]
+
 FLOOR_SCOPE_OPTIONS = [
     {"value": "single", "label": "Yhdessä huoneessa / yhdellä alueella"},
     {"value": "multiple", "label": "Useammassa huoneessa / kerroksessa (lisätään peräkkäin)"},
@@ -126,7 +141,7 @@ PANEL_GROUPS = [
 OPTIONS_MENU_CHOICES = [
     {
         "value": "guided_wizard",
-        "label": "Opastettu Kyllä / Ei -pika-asennus (Anturit, Varaaja, Lattialämmitys, Auto, Pumput + Suositukset)",
+        "label": "Opastettu Kyllä / Ei -pika-asennus (Yösähkö/Pörssisähkö, Anturit, Varaaja, Lattialämmitys, Auto, Pumput)",
     },
     {
         "value": "add_device",
@@ -154,8 +169,23 @@ def resolve_currency_and_unit(area: str, currency_choice: str) -> tuple[str, str
 
 
 def _build_recommendations(devices: list[dict], sensors_cfg: dict) -> list[str]:
-    """Luo käyttäjälle selkokieliset suositukset Kyllä/Ei-valintojen perusteella."""
+    """Luo käyttäjälle selkokieliset suositukset Kyllä/Ei-valintojen ja tariffityypin perusteella."""
     recs: list[str] = []
+    tariff = sensors_cfg.get("tariff_type", "spot")
+
+    if tariff == "night_tariff":
+        recs.append(
+            "Yösähkö / Kausisähkö valittu: kuormat suositellaan porrastettavaksi yöaikaan (22:00–07:00), "
+            "jotta lämminvesivaraaja, lattialämmitys ja sähköauto eivät käynnisty samalla sekunnilla klo 22:00."
+        )
+    elif tariff == "fixed":
+        recs.append(
+            "Kiinteähintainen sähkösopimus valittu: painopiste on pääsulakkeen suojauksessa ja suurten kuormien porrastuksessa."
+        )
+    else:
+        recs.append(
+            "Pörssisähkö valittu: kuormat keskitetään vuorokauden edullisimmille tunneille sulakerajojen puitteissa."
+        )
 
     upstairs_count = len(sensors_cfg.get("upstairs_entities", [])) + (
         1 if sensors_cfg.get("upstairs_wifi_names") else 0
@@ -174,17 +204,12 @@ def _build_recommendations(devices: list[dict], sensors_cfg: dict) -> list[str]:
         )
     else:
         recs.append(
-            "Ei sisälämpötila-antureita: lämmitys ajastetaan turvallisesti halvoille tunneille ja hintakaton mukaan. "
-            "Halutessasi voit lisätä myöhemmin esim. WiFi-lämpötila-anturin (Shelly H&T / RuuviTag) ylä- ja alakertaan."
+            "Ei sisälämpötila-antureita: lämmitys ajastetaan turvallisesti halvoille tunneille ja aikataulun mukaan."
         )
 
     if has_outdoor:
         recs.append(
             "Ulkoinen lämpötila-anturi yhdistetty: pakkasvaikutus ja lämmitystuntien tarve lasketaan paikallisen ulkolämpötilan mukaan."
-        )
-    else:
-        recs.append(
-            "Ei omaa ulkolämpötila-anturia: järjestelmä käyttää hinta- ja aikatauluohjausta sekä sääennustetta."
         )
 
     for dev in devices:
@@ -201,8 +226,8 @@ def _build_recommendations(devices: list[dict], sensors_cfg: dict) -> list[str]:
                 )
             else:
                 recs.append(
-                    f"{name} ({kw} kW): ei WiFi-/HA-ohjausta. AI-Sähkövahti varaa {kw} kW sulakekuormasta {dev.get('cheapest_hours_needed', 3)} halvimmalle tunnille. "
-                    "Suositus: lisää taakse WiFi-rele (esim. Shelly Pro 1PM / 3EM) automaattista yölämmitystä varten (+55 °C Legionella-turva)."
+                    f"{name} ({kw} kW): ei WiFi-/HA-ohjausta. Home Assistant ei katkaise 230/400 V virtaa ilman relettä/kontaktoria — "
+                    "suositus: sähköasentaja voi kytkeä edullisen WiFi-releen (esim. Shelly Pro 1PM) ohjaamaan varaajan olemassa olevaa kontaktoria (+55 °C Legionella-turva)."
                 )
 
         elif cat == "floor_heating":
@@ -210,33 +235,32 @@ def _build_recommendations(devices: list[dict], sensors_cfg: dict) -> list[str]:
             has_surface = bool(dev.get("has_surface_sensor"))
             if has_concrete:
                 recs.append(
-                    f"Lattialämmitys '{name}' ({kw} kW): betonianturi käytössä — suositus: varaava esilämmitys vuorokauden halvimmille tunneille (betoni luovuttaa lämpöä tasaisesti)."
+                    f"Lattialämmitys '{name}' ({kw} kW): betonianturi käytössä — suositus: varaava esilämmitys halvimmille tunneille tai yösähkölle."
                 )
             elif has_surface:
                 recs.append(
-                    f"Lattialämmitys '{name}' ({kw} kW): pintalämpötila-anturi käytössä (ei betonianturia) — suositus: lyhyemmät, tasaiset lämmitysjaksot ja hintakatto, jotta lattian pinta ei viilene liikaa."
+                    f"Lattialämmitys '{name}' ({kw} kW): pintalämpötila-anturi käytössä — suositus: lyhyemmät, tasaiset lämmitysjaksot, jotta lattian pinta ei viilene."
                 )
             else:
                 recs.append(
-                    f"Lattialämmitys '{name}' ({kw} kW): ei lattia-anturia — suositus: tasainen aikataulu- ja hintakatto-ohjaus ilman pitkiä katkoja."
+                    f"Lattialämmitys '{name}' ({kw} kW): ei lattia-anturia — suositus: tasainen aikataulu- ja hintakatto-ohjaus."
                 )
 
         elif cat == "ev_charger":
             if has_wifi and control_id:
                 recs.append(
-                    f"Sähköauto/laturi '{name}' ({kw} kW): ohjataan automaattisesti halvimmille tunneille ({control_id}). "
-                    "Auton vaihtuessa voit päivittää tai vaihtaa kohteen suoraan Määritä-valikosta rikkomatta muita automaatioita."
+                    f"Sähköauto/laturi '{name}' ({kw} kW): ohjataan suoraan HA-rajapinnan kautta ({control_id}) ilman erillistä relettä."
                 )
             else:
                 recs.append(
-                    f"Sähköauto/laturi '{name}' ({kw} kW): lisätty kuormanhallintaan ilman pilviyhteyttä — ajasta auton oma ajastin parhaille tunneille."
+                    f"Sähköauto/laturi '{name}' ({kw} kW): lisätty kuormanhallintaan ilman pilviyhteyttä — ajasta auton tai laturin oma ajastin halvimmille tunneille."
                 )
 
         elif cat in ("heat_pump", "heating_circuit", "sauna"):
             mode_txt = (
                 f"HA-ohjaus ({control_id})"
                 if (has_wifi and control_id)
-                else "manuaalinen / ei WiFi-yhteyttä (kuormavaraus)"
+                else "manuaalinen / vaatii releen tai kontaktorin etäohjaukseen"
             )
             recs.append(
                 f"{name} ({kw} kW): {mode_txt} — huomioitu ryhmäkeskuksen ({dev.get('panel_group', 'pääkeskus')}) sulakesuojassa."
@@ -488,15 +512,16 @@ class AISahkovahtiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     # -------------------------------------------------------------------------
-    # VAIHE 1: Sisä- (yläkerta / alakerta) ja ulkolämpötila-anturit (Kyllä / Ei)
+    # VAIHE 1: Sähkösopimustyyppi (yösähkö / pörssisähkö) & Lämpötila-anturit
     # -------------------------------------------------------------------------
     async def async_step_wiz_sensors_yn(self, user_input=None):
-        """Kysyy Kyllä/Ei: onko antureita sisällä (ylä-/alakerta) tai ulkona."""
+        """Kysyy sähkösopimustyypin ja Kyllä/Ei: onko antureita sisällä tai ulkona."""
         if user_input is not None:
             has_up = user_input.get("has_upstairs_sensor") == "yes"
             has_down = user_input.get("has_downstairs_sensor") == "yes"
             has_out = user_input.get("has_outdoor_sensor") == "yes"
             self._wizard_sensors = {
+                "tariff_type": user_input.get("tariff_type", "spot"),
                 "has_upstairs_sensor": has_up,
                 "has_downstairs_sensor": has_down,
                 "has_outdoor_sensor": has_out,
@@ -513,6 +538,12 @@ class AISahkovahtiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         schema = vol.Schema(
             {
+                vol.Required("tariff_type", default="spot"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=TARIFF_TYPE_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
                 vol.Required("has_upstairs_sensor", default="no"): selector.SelectSelector(
                     selector.SelectSelectorConfig(
                         options=YES_NO_OPTIONS,
@@ -1092,13 +1123,13 @@ class AISahkovahtiOptionsFlowHandler(config_entries.OptionsFlow):
             description_placeholders={"device_count": str(len(devices))},
         )
 
-    # Kyllä / Ei -pika-asennus myös Määritä-valikon kautta
     async def async_step_wiz_sensors_yn(self, user_input=None):
         if user_input is not None:
             has_up = user_input.get("has_upstairs_sensor") == "yes"
             has_down = user_input.get("has_downstairs_sensor") == "yes"
             has_out = user_input.get("has_outdoor_sensor") == "yes"
             self._wizard_sensors = {
+                "tariff_type": user_input.get("tariff_type", "spot"),
                 "has_upstairs_sensor": has_up,
                 "has_downstairs_sensor": has_down,
                 "has_outdoor_sensor": has_out,
@@ -1115,6 +1146,12 @@ class AISahkovahtiOptionsFlowHandler(config_entries.OptionsFlow):
 
         schema = vol.Schema(
             {
+                vol.Required("tariff_type", default="spot"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=TARIFF_TYPE_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
                 vol.Required("has_upstairs_sensor", default="no"): selector.SelectSelector(
                     selector.SelectSelectorConfig(
                         options=YES_NO_OPTIONS,
@@ -1433,7 +1470,7 @@ class AISahkovahtiOptionsFlowHandler(config_entries.OptionsFlow):
             self._wizard_devices.append(
                 {
                     "id": uuid.uuid4().hex[:8],
-                    "name": (user_input.get("name") or "Sähköauto / Latausasema").strip(),
+                    "name": (user_input.get("name") or "Sähköauto").strip(),
                     "category": "ev_charger",
                     "has_wifi_or_ha": has_wifi,
                     "power_kw": round(float(user_input.get("power_kw", 11.0)), 2),
