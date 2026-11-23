@@ -9,6 +9,21 @@ from homeassistant.helpers import selector
 
 DOMAIN = "aisahkovahti"
 
+YES_NO_OPTIONS = [
+    {"value": "yes", "label": "Kyllä"},
+    {"value": "no", "label": "Ei"},
+]
+
+FLOOR_SCOPE_OPTIONS = [
+    {"value": "single", "label": "Yhdessä huoneessa / yhdellä alueella"},
+    {"value": "multiple", "label": "Useammassa huoneessa / kerroksessa (lisätään peräkkäin)"},
+]
+
+SLAB_DEPTH_OPTIONS = [
+    {"value": "deep_35_50mm", "label": "Syvä betonianturi (35–50 mm — varaava laatta)"},
+    {"value": "shallow_or_near_pipe", "label": "Pinnassa tai lämpöputken lähellä"},
+]
+
 NORDPOOL_AREAS = [
     {"value": "FI", "label": "FI — Suomi / Finland (EUR)"},
     {"value": "SE1", "label": "SE1 — Ruotsi / Luleå (SEK / EUR)"},
@@ -93,7 +108,8 @@ PRICE_SOURCE_MODES = [
 
 DEVICE_CATEGORIES = [
     {"value": "water_heater", "label": "Lämminvesivaraaja (Legionella-turvavahti +55°C)"},
-    {"value": "heating_circuit", "label": "Sähkölämmitys / Lattialämmitys / Patterit (Yläkerta / Alakerta)"},
+    {"value": "floor_heating", "label": "Lattialämmitys (huone / kerros / betoni- tai pintalämpö)"},
+    {"value": "heating_circuit", "label": "Sähköpatterit / Kattolämmitys (Yläkerta / Alakerta)"},
     {"value": "heat_pump", "label": "Ilmalämpöpumppu / Maalämpö / VILP (esim. Mitsubishi, NIBE)"},
     {"value": "ev_charger", "label": "Sähköauto tai latausasema (esim. Tesla, Easee, Zaptec)"},
     {"value": "sauna", "label": "Saunan kiuas / Suuri kertakuorma"},
@@ -108,9 +124,22 @@ PANEL_GROUPS = [
 ]
 
 OPTIONS_MENU_CHOICES = [
-    {"value": "add_device", "label": "Lisää ohjattava laite tai lämmityspiiri (myös ilman nettiyhteyttä)"},
-    {"value": "manage_devices", "label": "Hallitse tai poista lisättyjä laitteita"},
-    {"value": "general_settings", "label": "Perusasetukset (Lisenssiavain, Maa, Valuutta, Hintalähde)"},
+    {
+        "value": "guided_wizard",
+        "label": "Opastettu Kyllä / Ei -pika-asennus (Anturit, Varaaja, Lattialämmitys, Auto, Pumput + Suositukset)",
+    },
+    {
+        "value": "add_device",
+        "label": "Lisää yksittäinen laite tai huone (myös ilman nettiyhteyttä)",
+    },
+    {
+        "value": "manage_devices",
+        "label": "Hallitse tai poista lisättyjä laitteita (esim. auton vaihto)",
+    },
+    {
+        "value": "general_settings",
+        "label": "Perusasetukset (Lisenssiavain, Maa, Valuutta, Hintalähde)",
+    },
 ]
 
 
@@ -124,8 +153,100 @@ def resolve_currency_and_unit(area: str, currency_choice: str) -> tuple[str, str
     return resolved, CURRENCY_SUBUNIT_MAP.get(resolved, "c/kWh")
 
 
+def _build_recommendations(devices: list[dict], sensors_cfg: dict) -> list[str]:
+    """Luo käyttäjälle selkokieliset suositukset Kyllä/Ei-valintojen perusteella."""
+    recs: list[str] = []
+
+    upstairs_count = len(sensors_cfg.get("upstairs_entities", [])) + (
+        1 if sensors_cfg.get("upstairs_wifi_names") else 0
+    )
+    downstairs_count = len(sensors_cfg.get("downstairs_entities", [])) + (
+        1 if sensors_cfg.get("downstairs_wifi_names") else 0
+    )
+    has_outdoor = bool(
+        sensors_cfg.get("outdoor_entities") or sensors_cfg.get("outdoor_wifi_names")
+    )
+
+    if upstairs_count or downstairs_count:
+        recs.append(
+            f"Sisäanturit käytössä (Yläkerta: {upstairs_count} kpl, Alakerta: {downstairs_count} kpl): "
+            "lämmitys ohjataan kerroskohtaisesti niin, ettei huonelämpö laske liikaa kalliina tunteina."
+        )
+    else:
+        recs.append(
+            "Ei sisälämpötila-antureita: lämmitys ajastetaan turvallisesti halvoille tunneille ja hintakaton mukaan. "
+            "Halutessasi voit lisätä myöhemmin esim. WiFi-lämpötila-anturin (Shelly H&T / RuuviTag) ylä- ja alakertaan."
+        )
+
+    if has_outdoor:
+        recs.append(
+            "Ulkoinen lämpötila-anturi yhdistetty: pakkasvaikutus ja lämmitystuntien tarve lasketaan paikallisen ulkolämpötilan mukaan."
+        )
+    else:
+        recs.append(
+            "Ei omaa ulkolämpötila-anturia: järjestelmä käyttää hinta- ja aikatauluohjausta sekä sääennustetta."
+        )
+
+    for dev in devices:
+        cat = dev.get("category")
+        name = dev.get("name", "Laite")
+        kw = dev.get("power_kw", 0)
+        has_wifi = bool(dev.get("has_wifi_or_ha"))
+        control_id = (dev.get("control_entity_id") or "").strip()
+
+        if cat == "water_heater":
+            if has_wifi and control_id:
+                recs.append(
+                    f"{name} ({kw} kW): etäohjaus ({control_id}) aktivoitu. Suositus: lämmitys {dev.get('cheapest_hours_needed', 3)} halvimmalle tunnille + Legionella-turvavahti (+55 °C)."
+                )
+            else:
+                recs.append(
+                    f"{name} ({kw} kW): ei WiFi-/HA-ohjausta. AI-Sähkövahti varaa {kw} kW sulakekuormasta {dev.get('cheapest_hours_needed', 3)} halvimmalle tunnille. "
+                    "Suositus: lisää taakse WiFi-rele (esim. Shelly Pro 1PM / 3EM) automaattista yölämmitystä varten (+55 °C Legionella-turva)."
+                )
+
+        elif cat == "floor_heating":
+            has_concrete = bool(dev.get("has_concrete_sensor"))
+            has_surface = bool(dev.get("has_surface_sensor"))
+            if has_concrete:
+                recs.append(
+                    f"Lattialämmitys '{name}' ({kw} kW): betonianturi käytössä — suositus: varaava esilämmitys vuorokauden halvimmille tunneille (betoni luovuttaa lämpöä tasaisesti)."
+                )
+            elif has_surface:
+                recs.append(
+                    f"Lattialämmitys '{name}' ({kw} kW): pintalämpötila-anturi käytössä (ei betonianturia) — suositus: lyhyemmät, tasaiset lämmitysjaksot ja hintakatto, jotta lattian pinta ei viilene liikaa."
+                )
+            else:
+                recs.append(
+                    f"Lattialämmitys '{name}' ({kw} kW): ei lattia-anturia — suositus: tasainen aikataulu- ja hintakatto-ohjaus ilman pitkiä katkoja."
+                )
+
+        elif cat == "ev_charger":
+            if has_wifi and control_id:
+                recs.append(
+                    f"Sähköauto/laturi '{name}' ({kw} kW): ohjataan automaattisesti halvimmille tunneille ({control_id}). "
+                    "Auton vaihtuessa voit päivittää tai vaihtaa kohteen suoraan Määritä-valikosta rikkomatta muita automaatioita."
+                )
+            else:
+                recs.append(
+                    f"Sähköauto/laturi '{name}' ({kw} kW): lisätty kuormanhallintaan ilman pilviyhteyttä — ajasta auton oma ajastin parhaille tunneille."
+                )
+
+        elif cat in ("heat_pump", "heating_circuit", "sauna"):
+            mode_txt = (
+                f"HA-ohjaus ({control_id})"
+                if (has_wifi and control_id)
+                else "manuaalinen / ei WiFi-yhteyttä (kuormavaraus)"
+            )
+            recs.append(
+                f"{name} ({kw} kW): {mode_txt} — huomioitu ryhmäkeskuksen ({dev.get('panel_group', 'pääkeskus')}) sulakesuojassa."
+            )
+
+    return recs
+
+
 def _build_config_schema(defaults: dict) -> vol.Schema:
-    """Rakentaa asennus- ja asetuslomakkeen monimaatuella, valuutoilla ja HA-sensorituella."""
+    """Rakentaa perusasetuslomakkeen."""
     default_area = defaults.get("area", "FI")
     default_mode = defaults.get(
         "price_source_mode",
@@ -188,7 +309,7 @@ def _build_config_schema(defaults: dict) -> vol.Schema:
 
 
 def _build_add_device_schema(defaults: dict | None = None) -> vol.Schema:
-    """Helppo lomake uuden laitteen lisäämiseen (toimii myös täysin ilman nettiyhteyttä)."""
+    """Helppo yksittäisen laitteen lisäyslomake (toimii myös ilman nettiyhteyttä)."""
     d = defaults or {}
     return vol.Schema(
         {
@@ -199,6 +320,14 @@ def _build_add_device_schema(defaults: dict | None = None) -> vol.Schema:
                 selector.SelectSelectorConfig(
                     options=DEVICE_CATEGORIES,
                     mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
+            vol.Required(
+                "has_wifi_or_ha", default=d.get("has_wifi_or_ha", "no")
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=YES_NO_OPTIONS,
+                    mode=selector.SelectSelectorMode.LIST,
                 )
             ),
             vol.Required(
@@ -240,6 +369,10 @@ def _build_add_device_schema(defaults: dict | None = None) -> vol.Schema:
                     domain=["switch", "climate", "water_heater", "number", "input_boolean"]
                 )
             ),
+            vol.Optional(
+                "wifi_device_note",
+                default=d.get("wifi_device_note", ""),
+            ): str,
         }
     )
 
@@ -313,14 +446,20 @@ async def _verify_license_on_server(hass, license_key: str) -> dict:
 
 
 class AISahkovahtiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """AI-Sähkövahdin asennusvelho (palvelinvarmennettu lisenssi + monimaa- ja valuuttatuki)."""
+    """AI-Sähkövahdin asennusvelho: lisenssitarkistus + opastettu Kyllä/Ei-kysely."""
 
     VERSION = 1
+
+    def __init__(self) -> None:
+        self._base_config: dict = {}
+        self._wizard_sensors: dict = {}
+        self._wizard_devices: list[dict] = []
+        self._floor_scope: str = "single"
 
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):
-        """Mahdollistaa lisenssiavaimen, maan, valuutan, hintalähteen ja laitteiden muokkaamisen."""
+        """Mahdollistaa laitteiden, antureiden, Kyllä/Ei-velhon ja perusasetusten muokkauksen."""
         return AISahkovahtiOptionsFlowHandler()
 
     async def async_step_user(self, user_input=None):
@@ -335,13 +474,11 @@ class AISahkovahtiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not errors:
                 status = await _verify_license_on_server(self.hass, cleaned["license_key"])
                 if status["active"]:
-                    verified_tier = status["tier"]
-                    cleaned["tier"] = verified_tier
-                    cleaned.setdefault("ui_devices", [])
-                    return self.async_create_entry(
-                        title=f"AI-Sähkövahti {cleaned['area']} [{cleaned['currency']}] ({verified_tier.upper()})",
-                        data=cleaned,
-                    )
+                    cleaned["tier"] = status["tier"]
+                    self._base_config = cleaned
+                    self._wizard_sensors = {}
+                    self._wizard_devices = []
+                    return await self.async_step_wiz_sensors_yn()
                 errors["base"] = "invalid_license_key"
 
         return self.async_show_form(
@@ -350,13 +487,580 @@ class AISahkovahtiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+    # -------------------------------------------------------------------------
+    # VAIHE 1: Sisä- (yläkerta / alakerta) ja ulkolämpötila-anturit (Kyllä / Ei)
+    # -------------------------------------------------------------------------
+    async def async_step_wiz_sensors_yn(self, user_input=None):
+        """Kysyy Kyllä/Ei: onko antureita sisällä (ylä-/alakerta) tai ulkona."""
+        if user_input is not None:
+            has_up = user_input.get("has_upstairs_sensor") == "yes"
+            has_down = user_input.get("has_downstairs_sensor") == "yes"
+            has_out = user_input.get("has_outdoor_sensor") == "yes"
+            self._wizard_sensors = {
+                "has_upstairs_sensor": has_up,
+                "has_downstairs_sensor": has_down,
+                "has_outdoor_sensor": has_out,
+                "upstairs_entities": [],
+                "upstairs_wifi_names": "",
+                "downstairs_entities": [],
+                "downstairs_wifi_names": "",
+                "outdoor_entities": [],
+                "outdoor_wifi_names": "",
+            }
+            if has_up or has_down or has_out:
+                return await self.async_step_wiz_sensors_details()
+            return await self.async_step_wiz_water_yn()
+
+        schema = vol.Schema(
+            {
+                vol.Required("has_upstairs_sensor", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+                vol.Required("has_downstairs_sensor", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+                vol.Required("has_outdoor_sensor", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+            }
+        )
+        return self.async_show_form(step_id="wiz_sensors_yn", data_schema=schema)
+
+    async def async_step_wiz_sensors_details(self, user_input=None):
+        """Antureiden valinta (useampi mahdollinen) ja/tai WiFi-nimen syöttö."""
+        if user_input is not None:
+            self._wizard_sensors["upstairs_entities"] = list(
+                user_input.get("upstairs_entities") or []
+            )
+            self._wizard_sensors["upstairs_wifi_names"] = (
+                user_input.get("upstairs_wifi_names") or ""
+            ).strip()
+            self._wizard_sensors["downstairs_entities"] = list(
+                user_input.get("downstairs_entities") or []
+            )
+            self._wizard_sensors["downstairs_wifi_names"] = (
+                user_input.get("downstairs_wifi_names") or ""
+            ).strip()
+            self._wizard_sensors["outdoor_entities"] = list(
+                user_input.get("outdoor_entities") or []
+            )
+            self._wizard_sensors["outdoor_wifi_names"] = (
+                user_input.get("outdoor_wifi_names") or ""
+            ).strip()
+            return await self.async_step_wiz_water_yn()
+
+        fields = {}
+        if self._wizard_sensors.get("has_upstairs_sensor"):
+            fields[vol.Optional("upstairs_entities", default=[])] = selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor", multiple=True)
+            )
+            fields[vol.Optional("upstairs_wifi_names", default="")] = str
+
+        if self._wizard_sensors.get("has_downstairs_sensor"):
+            fields[vol.Optional("downstairs_entities", default=[])] = selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor", multiple=True)
+            )
+            fields[vol.Optional("downstairs_wifi_names", default="")] = str
+
+        if self._wizard_sensors.get("has_outdoor_sensor"):
+            fields[vol.Optional("outdoor_entities", default=[])] = selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor", multiple=True)
+            )
+            fields[vol.Optional("outdoor_wifi_names", default="")] = str
+
+        return self.async_show_form(
+            step_id="wiz_sensors_details",
+            data_schema=vol.Schema(fields),
+        )
+
+    # -------------------------------------------------------------------------
+    # VAIHE 2: Lämminvesivaraaja (Kyllä / Ei -> WiFi/valmistaja Kyllä/Ei -> teho)
+    # -------------------------------------------------------------------------
+    async def async_step_wiz_water_yn(self, user_input=None):
+        """Kysyy Kyllä/Ei: onko kohteessa lämminvesivaraaja."""
+        if user_input is not None:
+            if user_input.get("has_water_heater") == "yes":
+                return await self.async_step_wiz_water_details()
+            return await self.async_step_wiz_floor_yn()
+
+        schema = vol.Schema(
+            {
+                vol.Required("has_water_heater", default="yes"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                )
+            }
+        )
+        return self.async_show_form(step_id="wiz_water_yn", data_schema=schema)
+
+    async def async_step_wiz_water_details(self, user_input=None):
+        """Lämminvesivaraajan tiedot (toimii myös ilman WiFi- tai valmistajayhteyttä)."""
+        if user_input is not None:
+            has_wifi = user_input.get("has_wifi_or_ha") == "yes"
+            control_entity = (
+                (user_input.get("control_entity_id") or "").strip() if has_wifi else ""
+            )
+            self._wizard_devices.append(
+                {
+                    "id": uuid.uuid4().hex[:8],
+                    "name": (user_input.get("name") or "Lämminvesivaraaja").strip(),
+                    "category": "water_heater",
+                    "has_wifi_or_ha": has_wifi,
+                    "power_kw": round(float(user_input.get("power_kw", 3.0)), 2),
+                    "panel_group": user_input.get("panel_group", "ryhmä_1_lämmitys"),
+                    "cheapest_hours_needed": int(
+                        user_input.get("cheapest_hours_needed", 3)
+                    ),
+                    "control_entity_id": control_entity,
+                    "wifi_device_note": (user_input.get("wifi_device_note") or "").strip(),
+                    "connection_mode": "ha_entity" if control_entity else "manual_offline",
+                }
+            )
+            return await self.async_step_wiz_floor_yn()
+
+        schema = vol.Schema(
+            {
+                vol.Required("name", default="Lämminvesivaraaja"): str,
+                vol.Required("has_wifi_or_ha", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+                vol.Required("power_kw", default=3.0): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0.5,
+                        max=30.0,
+                        step=0.1,
+                        unit_of_measurement="kW",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Required(
+                    "panel_group", default="ryhmä_1_lämmitys"
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=PANEL_GROUPS,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required(
+                    "cheapest_hours_needed", default=3
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=1,
+                        max=24,
+                        step=1,
+                        unit_of_measurement="h",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Optional("control_entity_id"): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain=["switch", "water_heater", "input_boolean"]
+                    )
+                ),
+                vol.Optional("wifi_device_note", default=""): str,
+            }
+        )
+        return self.async_show_form(step_id="wiz_water_details", data_schema=schema)
+
+    # -------------------------------------------------------------------------
+    # VAIHE 3: Lattialämmitys (Kyllä/Ei -> 1 vai useampi huone -> betoni/pinta)
+    # -------------------------------------------------------------------------
+    async def async_step_wiz_floor_yn(self, user_input=None):
+        """Kysyy Kyllä/Ei: onko lattialämmitystä (ja onko yhdessä vai useammassa huoneessa)."""
+        if user_input is not None:
+            if user_input.get("has_floor_heating") == "yes":
+                self._floor_scope = user_input.get("floor_scope", "single")
+                return await self.async_step_wiz_floor_room()
+            return await self.async_step_wiz_ev_yn()
+
+        schema = vol.Schema(
+            {
+                vol.Required("has_floor_heating", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+                vol.Required("floor_scope", default="single"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=FLOOR_SCOPE_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+            }
+        )
+        return self.async_show_form(step_id="wiz_floor_yn", data_schema=schema)
+
+    async def async_step_wiz_floor_room(self, user_input=None):
+        """Lattialämmityshuoneen tiedot: huoneen nimi, teho, betonianturi, pintalämpötila."""
+        if user_input is not None:
+            has_wifi = user_input.get("has_wifi_or_ha") == "yes"
+            has_concrete = user_input.get("has_concrete_sensor") == "yes"
+            has_surface = user_input.get("has_surface_sensor") == "yes"
+            control_entity = (
+                (user_input.get("control_entity_id") or "").strip() if has_wifi else ""
+            )
+            self._wizard_devices.append(
+                {
+                    "id": uuid.uuid4().hex[:8],
+                    "name": (user_input.get("room_name") or "Lattialämmitys").strip(),
+                    "category": "floor_heating",
+                    "has_wifi_or_ha": has_wifi,
+                    "power_kw": round(float(user_input.get("power_kw", 1.5)), 2),
+                    "panel_group": user_input.get("panel_group", "ryhmä_1_lämmitys"),
+                    "cheapest_hours_needed": int(
+                        user_input.get("cheapest_hours_needed", 4 if has_concrete else 6)
+                    ),
+                    "has_concrete_sensor": has_concrete,
+                    "slab_sensor_depth": (
+                        user_input.get("slab_sensor_depth", "deep_35_50mm")
+                        if has_concrete
+                        else "none"
+                    ),
+                    "has_surface_sensor": has_surface,
+                    "floor_temp_entity_id": (
+                        user_input.get("floor_temp_entity_id") or ""
+                    ).strip(),
+                    "control_entity_id": control_entity,
+                    "connection_mode": "ha_entity" if control_entity else "manual_offline",
+                }
+            )
+            if (
+                self._floor_scope == "multiple"
+                and user_input.get("add_another_room") == "yes"
+            ):
+                return await self.async_step_wiz_floor_room()
+            return await self.async_step_wiz_ev_yn()
+
+        fields = {
+            vol.Required("room_name", default="Kylpyhuone"): str,
+            vol.Required("power_kw", default=1.5): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0.1,
+                    max=30.0,
+                    step=0.1,
+                    unit_of_measurement="kW",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Required("has_wifi_or_ha", default="no"): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=YES_NO_OPTIONS,
+                    mode=selector.SelectSelectorMode.LIST,
+                )
+            ),
+            vol.Required("has_concrete_sensor", default="no"): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=YES_NO_OPTIONS,
+                    mode=selector.SelectSelectorMode.LIST,
+                )
+            ),
+            vol.Required(
+                "slab_sensor_depth", default="deep_35_50mm"
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=SLAB_DEPTH_OPTIONS,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
+            vol.Required("has_surface_sensor", default="no"): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=YES_NO_OPTIONS,
+                    mode=selector.SelectSelectorMode.LIST,
+                )
+            ),
+            vol.Optional("floor_temp_entity_id"): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            ),
+            vol.Optional("control_entity_id"): selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain=["switch", "climate", "input_boolean"]
+                )
+            ),
+            vol.Required(
+                "panel_group", default="ryhmä_1_lämmitys"
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=PANEL_GROUPS,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
+        }
+        if self._floor_scope == "multiple":
+            fields[
+                vol.Required("add_another_room", default="no")
+            ] = selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=YES_NO_OPTIONS,
+                    mode=selector.SelectSelectorMode.LIST,
+                )
+            )
+
+        return self.async_show_form(
+            step_id="wiz_floor_room",
+            data_schema=vol.Schema(fields),
+        )
+
+    # -------------------------------------------------------------------------
+    # VAIHE 4: Sähköauto tai latausasema (Kyllä / Ei)
+    # -------------------------------------------------------------------------
+    async def async_step_wiz_ev_yn(self, user_input=None):
+        """Kysyy Kyllä/Ei: onko sähköauto tai latausasema."""
+        if user_input is not None:
+            if user_input.get("has_ev") == "yes":
+                return await self.async_step_wiz_ev_details()
+            return await self.async_step_wiz_other_yn()
+
+        schema = vol.Schema(
+            {
+                vol.Required("has_ev", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                )
+            }
+        )
+        return self.async_show_form(step_id="wiz_ev_yn", data_schema=schema)
+
+    async def async_step_wiz_ev_details(self, user_input=None):
+        """Sähköauton / laturin tiedot (helppo vaihtaa milloin vain Määritä-valikosta)."""
+        if user_input is not None:
+            has_wifi = user_input.get("has_wifi_or_ha") == "yes"
+            control_entity = (
+                (user_input.get("control_entity_id") or "").strip() if has_wifi else ""
+            )
+            self._wizard_devices.append(
+                {
+                    "id": uuid.uuid4().hex[:8],
+                    "name": (user_input.get("name") or "Sähköauto").strip(),
+                    "category": "ev_charger",
+                    "has_wifi_or_ha": has_wifi,
+                    "power_kw": round(float(user_input.get("power_kw", 11.0)), 2),
+                    "panel_group": user_input.get("panel_group", "ryhmä_2_auto_piha"),
+                    "cheapest_hours_needed": int(
+                        user_input.get("cheapest_hours_needed", 4)
+                    ),
+                    "control_entity_id": control_entity,
+                    "wifi_device_note": (user_input.get("wifi_device_note") or "").strip(),
+                    "connection_mode": "ha_entity" if control_entity else "manual_offline",
+                }
+            )
+            return await self.async_step_wiz_other_yn()
+
+        schema = vol.Schema(
+            {
+                vol.Required("name", default="Sähköauto / Latausasema"): str,
+                vol.Required("has_wifi_or_ha", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+                vol.Required("power_kw", default=11.0): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=1.4,
+                        max=22.0,
+                        step=0.1,
+                        unit_of_measurement="kW",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Required(
+                    "panel_group", default="ryhmä_2_auto_piha"
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=PANEL_GROUPS,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required(
+                    "cheapest_hours_needed", default=4
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=1,
+                        max=24,
+                        step=1,
+                        unit_of_measurement="h",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Optional("control_entity_id"): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain=["switch", "number", "input_boolean"]
+                    )
+                ),
+                vol.Optional("wifi_device_note", default=""): str,
+            }
+        )
+        return self.async_show_form(step_id="wiz_ev_details", data_schema=schema)
+
+    # -------------------------------------------------------------------------
+    # VAIHE 5: Muut laitteet (ILP, sähköpatterit, sauna) & viimeistely
+    # -------------------------------------------------------------------------
+    async def async_step_wiz_other_yn(self, user_input=None):
+        """Kysyy Kyllä/Ei: lisätäänkö ilmalämpöpumppu, sähköpatterit tai sauna."""
+        if user_input is not None:
+            if user_input.get("has_other_device") == "yes":
+                return await self.async_step_wiz_other_details()
+            return await self._finish_wizard()
+
+        schema = vol.Schema(
+            {
+                vol.Required("has_other_device", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                )
+            }
+        )
+        return self.async_show_form(step_id="wiz_other_yn", data_schema=schema)
+
+    async def async_step_wiz_other_details(self, user_input=None):
+        """Ilmalämpöpumpun, sähköpatterien tai saunan lisäys."""
+        if user_input is not None:
+            has_wifi = user_input.get("has_wifi_or_ha") == "yes"
+            control_entity = (
+                (user_input.get("control_entity_id") or "").strip() if has_wifi else ""
+            )
+            self._wizard_devices.append(
+                {
+                    "id": uuid.uuid4().hex[:8],
+                    "name": (user_input.get("name") or "Lämmityslaite").strip(),
+                    "category": user_input.get("category", "heat_pump"),
+                    "has_wifi_or_ha": has_wifi,
+                    "power_kw": round(float(user_input.get("power_kw", 2.0)), 2),
+                    "panel_group": user_input.get("panel_group", "pääkeskus"),
+                    "cheapest_hours_needed": int(
+                        user_input.get("cheapest_hours_needed", 3)
+                    ),
+                    "control_entity_id": control_entity,
+                    "wifi_device_note": (user_input.get("wifi_device_note") or "").strip(),
+                    "connection_mode": "ha_entity" if control_entity else "manual_offline",
+                }
+            )
+            if user_input.get("add_more_other") == "yes":
+                return await self.async_step_wiz_other_details()
+            return await self._finish_wizard()
+
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    "category", default="heat_pump"
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            {
+                                "value": "heat_pump",
+                                "label": "Ilmalämpöpumppu / VILP / Maalämpö (esim. Mitsubishi, NIBE)",
+                            },
+                            {
+                                "value": "heating_circuit",
+                                "label": "Sähköpatterit (Yläkerta / Alakerta)",
+                            },
+                            {
+                                "value": "sauna",
+                                "label": "Saunan kiuas / Suuri kertakuorma",
+                            },
+                            {"value": "other", "label": "Muu sähkölaitteisto"},
+                        ],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required("name", default="Ilmalämpöpumppu"): str,
+                vol.Required("has_wifi_or_ha", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+                vol.Required("power_kw", default=2.0): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0.1,
+                        max=30.0,
+                        step=0.1,
+                        unit_of_measurement="kW",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Required("panel_group", default="pääkeskus"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=PANEL_GROUPS,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required(
+                    "cheapest_hours_needed", default=3
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=1,
+                        max=24,
+                        step=1,
+                        unit_of_measurement="h",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Optional("control_entity_id"): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain=["switch", "climate", "water_heater", "input_boolean"]
+                    )
+                ),
+                vol.Optional("wifi_device_note", default=""): str,
+                vol.Required("add_more_other", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+            }
+        )
+        return self.async_show_form(step_id="wiz_other_details", data_schema=schema)
+
+    async def _finish_wizard(self):
+        """Tallentaa valinnat ja automaattisesti luodut suositukset."""
+        final_data = dict(self._base_config)
+        final_data["ui_devices"] = list(self._wizard_devices)
+        final_data["temperature_sensors"] = dict(self._wizard_sensors)
+        final_data["wizard_recommendations"] = _build_recommendations(
+            self._wizard_devices, self._wizard_sensors
+        )
+        tier_upper = str(final_data.get("tier", "pro")).upper()
+        return self.async_create_entry(
+            title=f"AI-Sähkövahti {final_data['area']} [{final_data['currency']}] ({tier_upper})",
+            data=final_data,
+        )
+
 
 class AISahkovahtiOptionsFlowHandler(config_entries.OptionsFlow):
-    """Mahdollistaa laitteiden lisäyksen/poiston sekä lisenssiavaimen, alueen ja hintalähteen muokkauksen."""
+    """Graafinen hallintavalikko: Kyllä/Ei-pika-asennus, yksittäinen lisäys, poisto ja asetukset."""
+
+    def __init__(self) -> None:
+        self._wizard_sensors: dict = {}
+        self._wizard_devices: list[dict] = []
+        self._floor_scope: str = "single"
 
     async def async_step_init(self, user_input=None):
         if user_input is not None:
             action = user_input.get("menu_action")
+            if action == "guided_wizard":
+                self._wizard_sensors = {}
+                self._wizard_devices = []
+                return await self.async_step_wiz_sensors_yn()
             if action == "add_device":
                 return await self.async_step_add_device()
             if action == "manage_devices":
@@ -366,7 +1070,7 @@ class AISahkovahtiOptionsFlowHandler(config_entries.OptionsFlow):
         devices = list(self.config_entry.data.get("ui_devices", []))
         schema = vol.Schema(
             {
-                vol.Required("menu_action", default="add_device"): selector.SelectSelector(
+                vol.Required("menu_action", default="guided_wizard"): selector.SelectSelector(
                     selector.SelectSelectorConfig(
                         options=OPTIONS_MENU_CHOICES,
                         mode=selector.SelectSelectorMode.LIST,
@@ -380,29 +1084,575 @@ class AISahkovahtiOptionsFlowHandler(config_entries.OptionsFlow):
             description_placeholders={"device_count": str(len(devices))},
         )
 
+    # Kyllä / Ei -pika-asennus myös Määritä-valikon kautta
+    async def async_step_wiz_sensors_yn(self, user_input=None):
+        if user_input is not None:
+            has_up = user_input.get("has_upstairs_sensor") == "yes"
+            has_down = user_input.get("has_downstairs_sensor") == "yes"
+            has_out = user_input.get("has_outdoor_sensor") == "yes"
+            self._wizard_sensors = {
+                "has_upstairs_sensor": has_up,
+                "has_downstairs_sensor": has_down,
+                "has_outdoor_sensor": has_out,
+                "upstairs_entities": [],
+                "upstairs_wifi_names": "",
+                "downstairs_entities": [],
+                "downstairs_wifi_names": "",
+                "outdoor_entities": [],
+                "outdoor_wifi_names": "",
+            }
+            if has_up or has_down or has_out:
+                return await self.async_step_wiz_sensors_details()
+            return await self.async_step_wiz_water_yn()
+
+        schema = vol.Schema(
+            {
+                vol.Required("has_upstairs_sensor", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+                vol.Required("has_downstairs_sensor", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+                vol.Required("has_outdoor_sensor", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+            }
+        )
+        return self.async_show_form(step_id="wiz_sensors_yn", data_schema=schema)
+
+    async def async_step_wiz_sensors_details(self, user_input=None):
+        if user_input is not None:
+            self._wizard_sensors["upstairs_entities"] = list(
+                user_input.get("upstairs_entities") or []
+            )
+            self._wizard_sensors["upstairs_wifi_names"] = (
+                user_input.get("upstairs_wifi_names") or ""
+            ).strip()
+            self._wizard_sensors["downstairs_entities"] = list(
+                user_input.get("downstairs_entities") or []
+            )
+            self._wizard_sensors["downstairs_wifi_names"] = (
+                user_input.get("downstairs_wifi_names") or ""
+            ).strip()
+            self._wizard_sensors["outdoor_entities"] = list(
+                user_input.get("outdoor_entities") or []
+            )
+            self._wizard_sensors["outdoor_wifi_names"] = (
+                user_input.get("outdoor_wifi_names") or ""
+            ).strip()
+            return await self.async_step_wiz_water_yn()
+
+        fields = {}
+        if self._wizard_sensors.get("has_upstairs_sensor"):
+            fields[vol.Optional("upstairs_entities", default=[])] = selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor", multiple=True)
+            )
+            fields[vol.Optional("upstairs_wifi_names", default="")] = str
+
+        if self._wizard_sensors.get("has_downstairs_sensor"):
+            fields[vol.Optional("downstairs_entities", default=[])] = selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor", multiple=True)
+            )
+            fields[vol.Optional("downstairs_wifi_names", default="")] = str
+
+        if self._wizard_sensors.get("has_outdoor_sensor"):
+            fields[vol.Optional("outdoor_entities", default=[])] = selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor", multiple=True)
+            )
+            fields[vol.Optional("outdoor_wifi_names", default="")] = str
+
+        return self.async_show_form(
+            step_id="wiz_sensors_details",
+            data_schema=vol.Schema(fields),
+        )
+
+    async def async_step_wiz_water_yn(self, user_input=None):
+        if user_input is not None:
+            if user_input.get("has_water_heater") == "yes":
+                return await self.async_step_wiz_water_details()
+            return await self.async_step_wiz_floor_yn()
+
+        schema = vol.Schema(
+            {
+                vol.Required("has_water_heater", default="yes"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                )
+            }
+        )
+        return self.async_show_form(step_id="wiz_water_yn", data_schema=schema)
+
+    async def async_step_wiz_water_details(self, user_input=None):
+        if user_input is not None:
+            has_wifi = user_input.get("has_wifi_or_ha") == "yes"
+            control_entity = (
+                (user_input.get("control_entity_id") or "").strip() if has_wifi else ""
+            )
+            self._wizard_devices.append(
+                {
+                    "id": uuid.uuid4().hex[:8],
+                    "name": (user_input.get("name") or "Lämminvesivaraaja").strip(),
+                    "category": "water_heater",
+                    "has_wifi_or_ha": has_wifi,
+                    "power_kw": round(float(user_input.get("power_kw", 3.0)), 2),
+                    "panel_group": user_input.get("panel_group", "ryhmä_1_lämmitys"),
+                    "cheapest_hours_needed": int(
+                        user_input.get("cheapest_hours_needed", 3)
+                    ),
+                    "control_entity_id": control_entity,
+                    "wifi_device_note": (user_input.get("wifi_device_note") or "").strip(),
+                    "connection_mode": "ha_entity" if control_entity else "manual_offline",
+                }
+            )
+            return await self.async_step_wiz_floor_yn()
+
+        schema = vol.Schema(
+            {
+                vol.Required("name", default="Lämminvesivaraaja"): str,
+                vol.Required("has_wifi_or_ha", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+                vol.Required("power_kw", default=3.0): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0.5,
+                        max=30.0,
+                        step=0.1,
+                        unit_of_measurement="kW",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Required(
+                    "panel_group", default="ryhmä_1_lämmitys"
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=PANEL_GROUPS,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required(
+                    "cheapest_hours_needed", default=3
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=1,
+                        max=24,
+                        step=1,
+                        unit_of_measurement="h",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Optional("control_entity_id"): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain=["switch", "water_heater", "input_boolean"]
+                    )
+                ),
+                vol.Optional("wifi_device_note", default=""): str,
+            }
+        )
+        return self.async_show_form(step_id="wiz_water_details", data_schema=schema)
+
+    async def async_step_wiz_floor_yn(self, user_input=None):
+        if user_input is not None:
+            if user_input.get("has_floor_heating") == "yes":
+                self._floor_scope = user_input.get("floor_scope", "single")
+                return await self.async_step_wiz_floor_room()
+            return await self.async_step_wiz_ev_yn()
+
+        schema = vol.Schema(
+            {
+                vol.Required("has_floor_heating", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+                vol.Required("floor_scope", default="single"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=FLOOR_SCOPE_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+            }
+        )
+        return self.async_show_form(step_id="wiz_floor_yn", data_schema=schema)
+
+    async def async_step_wiz_floor_room(self, user_input=None):
+        if user_input is not None:
+            has_wifi = user_input.get("has_wifi_or_ha") == "yes"
+            has_concrete = user_input.get("has_concrete_sensor") == "yes"
+            has_surface = user_input.get("has_surface_sensor") == "yes"
+            control_entity = (
+                (user_input.get("control_entity_id") or "").strip() if has_wifi else ""
+            )
+            self._wizard_devices.append(
+                {
+                    "id": uuid.uuid4().hex[:8],
+                    "name": (user_input.get("room_name") or "Lattialämmitys").strip(),
+                    "category": "floor_heating",
+                    "has_wifi_or_ha": has_wifi,
+                    "power_kw": round(float(user_input.get("power_kw", 1.5)), 2),
+                    "panel_group": user_input.get("panel_group", "ryhmä_1_lämmitys"),
+                    "cheapest_hours_needed": int(
+                        user_input.get("cheapest_hours_needed", 4 if has_concrete else 6)
+                    ),
+                    "has_concrete_sensor": has_concrete,
+                    "slab_sensor_depth": (
+                        user_input.get("slab_sensor_depth", "deep_35_50mm")
+                        if has_concrete
+                        else "none"
+                    ),
+                    "has_surface_sensor": has_surface,
+                    "floor_temp_entity_id": (
+                        user_input.get("floor_temp_entity_id") or ""
+                    ).strip(),
+                    "control_entity_id": control_entity,
+                    "connection_mode": "ha_entity" if control_entity else "manual_offline",
+                }
+            )
+            if (
+                self._floor_scope == "multiple"
+                and user_input.get("add_another_room") == "yes"
+            ):
+                return await self.async_step_wiz_floor_room()
+            return await self.async_step_wiz_ev_yn()
+
+        fields = {
+            vol.Required("room_name", default="Kylpyhuone"): str,
+            vol.Required("power_kw", default=1.5): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0.1,
+                    max=30.0,
+                    step=0.1,
+                    unit_of_measurement="kW",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Required("has_wifi_or_ha", default="no"): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=YES_NO_OPTIONS,
+                    mode=selector.SelectSelectorMode.LIST,
+                )
+            ),
+            vol.Required("has_concrete_sensor", default="no"): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=YES_NO_OPTIONS,
+                    mode=selector.SelectSelectorMode.LIST,
+                )
+            ),
+            vol.Required(
+                "slab_sensor_depth", default="deep_35_50mm"
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=SLAB_DEPTH_OPTIONS,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
+            vol.Required("has_surface_sensor", default="no"): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=YES_NO_OPTIONS,
+                    mode=selector.SelectSelectorMode.LIST,
+                )
+            ),
+            vol.Optional("floor_temp_entity_id"): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            ),
+            vol.Optional("control_entity_id"): selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain=["switch", "climate", "input_boolean"]
+                )
+            ),
+            vol.Required(
+                "panel_group", default="ryhmä_1_lämmitys"
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=PANEL_GROUPS,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
+        }
+        if self._floor_scope == "multiple":
+            fields[
+                vol.Required("add_another_room", default="no")
+            ] = selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=YES_NO_OPTIONS,
+                    mode=selector.SelectSelectorMode.LIST,
+                )
+            )
+
+        return self.async_show_form(
+            step_id="wiz_floor_room",
+            data_schema=vol.Schema(fields),
+        )
+
+    async def async_step_wiz_ev_yn(self, user_input=None):
+        if user_input is not None:
+            if user_input.get("has_ev") == "yes":
+                return await self.async_step_wiz_ev_details()
+            return await self.async_step_wiz_other_yn()
+
+        schema = vol.Schema(
+            {
+                vol.Required("has_ev", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                )
+            }
+        )
+        return self.async_show_form(step_id="wiz_ev_yn", data_schema=schema)
+
+    async def async_step_wiz_ev_details(self, user_input=None):
+        if user_input is not None:
+            has_wifi = user_input.get("has_wifi_or_ha") == "yes"
+            control_entity = (
+                (user_input.get("control_entity_id") or "").strip() if has_wifi else ""
+            )
+            self._wizard_devices.append(
+                {
+                    "id": uuid.uuid4().hex[:8],
+                    "name": (user_input.get("name") or "Sähköauto / Latausasema").strip(),
+                    "category": "ev_charger",
+                    "has_wifi_or_ha": has_wifi,
+                    "power_kw": round(float(user_input.get("power_kw", 11.0)), 2),
+                    "panel_group": user_input.get("panel_group", "ryhmä_2_auto_piha"),
+                    "cheapest_hours_needed": int(
+                        user_input.get("cheapest_hours_needed", 4)
+                    ),
+                    "control_entity_id": control_entity,
+                    "wifi_device_note": (user_input.get("wifi_device_note") or "").strip(),
+                    "connection_mode": "ha_entity" if control_entity else "manual_offline",
+                }
+            )
+            return await self.async_step_wiz_other_yn()
+
+        schema = vol.Schema(
+            {
+                vol.Required("name", default="Sähköauto / Latausasema"): str,
+                vol.Required("has_wifi_or_ha", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+                vol.Required("power_kw", default=11.0): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=1.4,
+                        max=22.0,
+                        step=0.1,
+                        unit_of_measurement="kW",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Required(
+                    "panel_group", default="ryhmä_2_auto_piha"
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=PANEL_GROUPS,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required(
+                    "cheapest_hours_needed", default=4
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=1,
+                        max=24,
+                        step=1,
+                        unit_of_measurement="h",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Optional("control_entity_id"): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain=["switch", "number", "input_boolean"]
+                    )
+                ),
+                vol.Optional("wifi_device_note", default=""): str,
+            }
+        )
+        return self.async_show_form(step_id="wiz_ev_details", data_schema=schema)
+
+    async def async_step_wiz_other_yn(self, user_input=None):
+        if user_input is not None:
+            if user_input.get("has_other_device") == "yes":
+                return await self.async_step_wiz_other_details()
+            return await self._finish_options_wizard()
+
+        schema = vol.Schema(
+            {
+                vol.Required("has_other_device", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                )
+            }
+        )
+        return self.async_show_form(step_id="wiz_other_yn", data_schema=schema)
+
+    async def async_step_wiz_other_details(self, user_input=None):
+        if user_input is not None:
+            has_wifi = user_input.get("has_wifi_or_ha") == "yes"
+            control_entity = (
+                (user_input.get("control_entity_id") or "").strip() if has_wifi else ""
+            )
+            self._wizard_devices.append(
+                {
+                    "id": uuid.uuid4().hex[:8],
+                    "name": (user_input.get("name") or "Lämmityslaite").strip(),
+                    "category": user_input.get("category", "heat_pump"),
+                    "has_wifi_or_ha": has_wifi,
+                    "power_kw": round(float(user_input.get("power_kw", 2.0)), 2),
+                    "panel_group": user_input.get("panel_group", "pääkeskus"),
+                    "cheapest_hours_needed": int(
+                        user_input.get("cheapest_hours_needed", 3)
+                    ),
+                    "control_entity_id": control_entity,
+                    "wifi_device_note": (user_input.get("wifi_device_note") or "").strip(),
+                    "connection_mode": "ha_entity" if control_entity else "manual_offline",
+                }
+            )
+            if user_input.get("add_more_other") == "yes":
+                return await self.async_step_wiz_other_details()
+            return await self._finish_options_wizard()
+
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    "category", default="heat_pump"
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            {
+                                "value": "heat_pump",
+                                "label": "Ilmalämpöpumppu / VILP / Maalämpö (esim. Mitsubishi, NIBE)",
+                            },
+                            {
+                                "value": "heating_circuit",
+                                "label": "Sähköpatterit (Yläkerta / Alakerta)",
+                            },
+                            {
+                                "value": "sauna",
+                                "label": "Saunan kiuas / Suuri kertakuorma",
+                            },
+                            {"value": "other", "label": "Muu sähkölaitteisto"},
+                        ],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required("name", default="Ilmalämpöpumppu"): str,
+                vol.Required("has_wifi_or_ha", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+                vol.Required("power_kw", default=2.0): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0.1,
+                        max=30.0,
+                        step=0.1,
+                        unit_of_measurement="kW",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Required("panel_group", default="pääkeskus"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=PANEL_GROUPS,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required(
+                    "cheapest_hours_needed", default=3
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=1,
+                        max=24,
+                        step=1,
+                        unit_of_measurement="h",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Optional("control_entity_id"): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain=["switch", "climate", "water_heater", "input_boolean"]
+                    )
+                ),
+                vol.Optional("wifi_device_note", default=""): str,
+                vol.Required("add_more_other", default="no"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=YES_NO_OPTIONS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+            }
+        )
+        return self.async_show_form(step_id="wiz_other_details", data_schema=schema)
+
+    async def _finish_options_wizard(self):
+        updated = dict(self.config_entry.data)
+        updated["ui_devices"] = list(self._wizard_devices)
+        updated["temperature_sensors"] = dict(self._wizard_sensors)
+        updated["wizard_recommendations"] = _build_recommendations(
+            self._wizard_devices, self._wizard_sensors
+        )
+        self.hass.config_entries.async_update_entry(
+            self.config_entry,
+            data=updated,
+        )
+        await self.hass.config_entries.async_reload(self.config_entry.entry_id)
+        return self.async_create_entry(title="", data={})
+
     async def async_step_add_device(self, user_input=None):
-        """Lisää uuden ohjattavan laitteen (toimii sekä älyreleellä että ilman nettiyhteyttä)."""
+        """Lisää yksittäisen ohjattavan laitteen (toimii myös ilman nettiyhteyttä)."""
         errors = {}
         if user_input is not None:
             name = (user_input.get("name") or "").strip()
             if not name:
                 errors["name"] = "missing_device_name"
             else:
-                control_entity = (user_input.get("control_entity_id") or "").strip()
+                has_wifi = user_input.get("has_wifi_or_ha") == "yes"
+                control_entity = (
+                    (user_input.get("control_entity_id") or "").strip()
+                    if has_wifi
+                    else ""
+                )
                 new_device = {
                     "id": uuid.uuid4().hex[:8],
                     "name": name,
                     "category": user_input.get("category", "other"),
+                    "has_wifi_or_ha": has_wifi,
                     "power_kw": round(float(user_input.get("power_kw", 2.0)), 2),
                     "panel_group": user_input.get("panel_group", "pääkeskus"),
-                    "cheapest_hours_needed": int(user_input.get("cheapest_hours_needed", 3)),
+                    "cheapest_hours_needed": int(
+                        user_input.get("cheapest_hours_needed", 3)
+                    ),
                     "control_entity_id": control_entity,
+                    "wifi_device_note": (user_input.get("wifi_device_note") or "").strip(),
                     "connection_mode": "ha_entity" if control_entity else "manual_offline",
                 }
                 updated = dict(self.config_entry.data)
                 devices = list(updated.get("ui_devices", []))
                 devices.append(new_device)
                 updated["ui_devices"] = devices
+                updated["wizard_recommendations"] = _build_recommendations(
+                    devices, dict(updated.get("temperature_sensors", {}))
+                )
 
                 self.hass.config_entries.async_update_entry(
                     self.config_entry,
@@ -428,9 +1678,11 @@ class AISahkovahtiOptionsFlowHandler(config_entries.OptionsFlow):
         if user_input is not None:
             to_remove = set(user_input.get("remove_ids") or [])
             if to_remove:
-                updated["ui_devices"] = [
-                    d for d in devices if d.get("id") not in to_remove
-                ]
+                remaining = [d for d in devices if d.get("id") not in to_remove]
+                updated["ui_devices"] = remaining
+                updated["wizard_recommendations"] = _build_recommendations(
+                    remaining, dict(updated.get("temperature_sensors", {}))
+                )
                 self.hass.config_entries.async_update_entry(
                     self.config_entry,
                     data=updated,
@@ -443,7 +1695,7 @@ class AISahkovahtiOptionsFlowHandler(config_entries.OptionsFlow):
             conn_label = (
                 f"HA: {d['control_entity_id']}"
                 if d.get("control_entity_id")
-                else "Manuaalinen / Ei nettiyhteyttä"
+                else "Manuaalinen / Ei WiFi-yhteyttä"
             )
             options.append(
                 {
