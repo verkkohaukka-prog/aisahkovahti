@@ -1,4 +1,5 @@
 from urllib.parse import urlencode
+import uuid
 import voluptuous as vol
 import async_timeout
 from homeassistant import config_entries
@@ -90,6 +91,28 @@ PRICE_SOURCE_MODES = [
     {"value": "custom_api", "label": "Oma API-osoite (URL + valinnainen API-avain)"},
 ]
 
+DEVICE_CATEGORIES = [
+    {"value": "water_heater", "label": "Lämminvesivaraaja (Legionella-turvavahti +55°C)"},
+    {"value": "heating_circuit", "label": "Sähkölämmitys / Lattialämmitys / Patterit (Yläkerta / Alakerta)"},
+    {"value": "heat_pump", "label": "Ilmalämpöpumppu / Maalämpö / VILP (esim. Mitsubishi, NIBE)"},
+    {"value": "ev_charger", "label": "Sähköauto tai latausasema (esim. Tesla, Easee, Zaptec)"},
+    {"value": "sauna", "label": "Saunan kiuas / Suuri kertakuorma"},
+    {"value": "other", "label": "Muu sähkölaitteisto / Kuorma"},
+]
+
+PANEL_GROUPS = [
+    {"value": "pääkeskus", "label": "Pääkeskus (yleinen)"},
+    {"value": "ryhmä_1_lämmitys", "label": "Ryhmä 1 — Lämmitys / Varaaja"},
+    {"value": "ryhmä_2_auto_piha", "label": "Ryhmä 2 — Autotalli / Lataus"},
+    {"value": "ryhmä_3_sauna_kodinhoito", "label": "Ryhmä 3 — Sauna / Kodinhoitohuone"},
+]
+
+OPTIONS_MENU_CHOICES = [
+    {"value": "add_device", "label": "Lisää ohjattava laite tai lämmityspiiri (myös ilman nettiyhteyttä)"},
+    {"value": "manage_devices", "label": "Hallitse tai poista lisättyjä laitteita"},
+    {"value": "general_settings", "label": "Perusasetukset (Lisenssiavain, Maa, Valuutta, Hintalähde)"},
+]
+
 
 def resolve_currency_and_unit(area: str, currency_choice: str) -> tuple[str, str]:
     """Palauttaa toteutuneen valuuttakoodin ja alayksikön (esim. SEK -> öre/kWh)."""
@@ -164,6 +187,63 @@ def _build_config_schema(defaults: dict) -> vol.Schema:
     return vol.Schema(fields)
 
 
+def _build_add_device_schema(defaults: dict | None = None) -> vol.Schema:
+    """Helppo lomake uuden laitteen lisäämiseen (toimii myös täysin ilman nettiyhteyttä)."""
+    d = defaults or {}
+    return vol.Schema(
+        {
+            vol.Required("name", default=d.get("name", "")): str,
+            vol.Required(
+                "category", default=d.get("category", "water_heater")
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=DEVICE_CATEGORIES,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
+            vol.Required(
+                "power_kw", default=float(d.get("power_kw", 2.0))
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0.1,
+                    max=50.0,
+                    step=0.1,
+                    unit_of_measurement="kW",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Required(
+                "panel_group", default=d.get("panel_group", "pääkeskus")
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=PANEL_GROUPS,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
+            vol.Required(
+                "cheapest_hours_needed",
+                default=int(d.get("cheapest_hours_needed", 3)),
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=1,
+                    max=24,
+                    step=1,
+                    unit_of_measurement="h",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Optional(
+                "control_entity_id",
+                description={"suggested_value": d.get("control_entity_id")},
+            ): selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain=["switch", "climate", "water_heater", "number", "input_boolean"]
+                )
+            ),
+        }
+    )
+
+
 def _normalize_and_validate_input(user_input: dict, fallback: dict | None = None):
     """Yhtenäistää ja tarkistaa käyttäjän syötteet asennuksessa ja asetuksissa."""
     base = fallback or {}
@@ -195,6 +275,7 @@ def _normalize_and_validate_input(user_input: dict, fallback: dict | None = None
         errors["custom_price_url"] = "missing_custom_url"
 
     cleaned = {
+        **base,
         "license_key": license_key,
         "area": area,
         "currency_choice": currency_choice,
@@ -239,7 +320,7 @@ class AISahkovahtiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):
-        """Mahdollistaa lisenssiavaimen, maan, valuutan ja hintalähteen päivittämisen asetuksista."""
+        """Mahdollistaa lisenssiavaimen, maan, valuutan, hintalähteen ja laitteiden muokkaamisen."""
         return AISahkovahtiOptionsFlowHandler()
 
     async def async_step_user(self, user_input=None):
@@ -256,6 +337,7 @@ class AISahkovahtiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if status["active"]:
                     verified_tier = status["tier"]
                     cleaned["tier"] = verified_tier
+                    cleaned.setdefault("ui_devices", [])
                     return self.async_create_entry(
                         title=f"AI-Sähkövahti {cleaned['area']} [{cleaned['currency']}] ({verified_tier.upper()})",
                         data=cleaned,
@@ -270,9 +352,124 @@ class AISahkovahtiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class AISahkovahtiOptionsFlowHandler(config_entries.OptionsFlow):
-    """Mahdollistaa lisenssiavaimen, hinta-alueen, valuutan ja oman hintalähteen muokkaamisen."""
+    """Mahdollistaa laitteiden lisäyksen/poiston sekä lisenssiavaimen, alueen ja hintalähteen muokkauksen."""
 
     async def async_step_init(self, user_input=None):
+        if user_input is not None:
+            action = user_input.get("menu_action")
+            if action == "add_device":
+                return await self.async_step_add_device()
+            if action == "manage_devices":
+                return await self.async_step_manage_devices()
+            return await self.async_step_general_settings()
+
+        devices = list(self.config_entry.data.get("ui_devices", []))
+        schema = vol.Schema(
+            {
+                vol.Required("menu_action", default="add_device"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=OPTIONS_MENU_CHOICES,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                )
+            }
+        )
+        return self.async_show_form(
+            step_id="init",
+            data_schema=schema,
+            description_placeholders={"device_count": str(len(devices))},
+        )
+
+    async def async_step_add_device(self, user_input=None):
+        """Lisää uuden ohjattavan laitteen (toimii sekä älyreleellä että ilman nettiyhteyttä)."""
+        errors = {}
+        if user_input is not None:
+            name = (user_input.get("name") or "").strip()
+            if not name:
+                errors["name"] = "missing_device_name"
+            else:
+                control_entity = (user_input.get("control_entity_id") or "").strip()
+                new_device = {
+                    "id": uuid.uuid4().hex[:8],
+                    "name": name,
+                    "category": user_input.get("category", "other"),
+                    "power_kw": round(float(user_input.get("power_kw", 2.0)), 2),
+                    "panel_group": user_input.get("panel_group", "pääkeskus"),
+                    "cheapest_hours_needed": int(user_input.get("cheapest_hours_needed", 3)),
+                    "control_entity_id": control_entity,
+                    "connection_mode": "ha_entity" if control_entity else "manual_offline",
+                }
+                updated = dict(self.config_entry.data)
+                devices = list(updated.get("ui_devices", []))
+                devices.append(new_device)
+                updated["ui_devices"] = devices
+
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry,
+                    data=updated,
+                )
+                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
+                return self.async_create_entry(title="", data={})
+
+        return self.async_show_form(
+            step_id="add_device",
+            data_schema=_build_add_device_schema(user_input),
+            errors=errors,
+        )
+
+    async def async_step_manage_devices(self, user_input=None):
+        """Mahdollistaa lisättyjen laitteiden tarkastelun ja poistamisen yhdellä klikkauksella."""
+        updated = dict(self.config_entry.data)
+        devices = list(updated.get("ui_devices", []))
+
+        if not devices:
+            return await self.async_step_add_device()
+
+        if user_input is not None:
+            to_remove = set(user_input.get("remove_ids") or [])
+            if to_remove:
+                updated["ui_devices"] = [
+                    d for d in devices if d.get("id") not in to_remove
+                ]
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry,
+                    data=updated,
+                )
+                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
+            return self.async_create_entry(title="", data={})
+
+        options = []
+        for d in devices:
+            conn_label = (
+                f"HA: {d['control_entity_id']}"
+                if d.get("control_entity_id")
+                else "Manuaalinen / Ei nettiyhteyttä"
+            )
+            options.append(
+                {
+                    "value": d["id"],
+                    "label": f"{d['name']} ({d['power_kw']} kW, {d['panel_group']} — {conn_label})",
+                }
+            )
+
+        schema = vol.Schema(
+            {
+                vol.Optional("remove_ids", default=[]): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=options,
+                        multiple=True,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                )
+            }
+        )
+        return self.async_show_form(
+            step_id="manage_devices",
+            data_schema=schema,
+        )
+
+    async def async_step_general_settings(self, user_input=None):
+        """Perusasetusten muokkaus."""
         errors = {}
         current = dict(self.config_entry.data)
 
@@ -294,7 +491,7 @@ class AISahkovahtiOptionsFlowHandler(config_entries.OptionsFlow):
                 errors["base"] = "invalid_license_key"
 
         return self.async_show_form(
-            step_id="init",
+            step_id="general_settings",
             data_schema=_build_config_schema(user_input or current),
             errors=errors,
         )
